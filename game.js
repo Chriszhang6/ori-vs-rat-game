@@ -4,9 +4,9 @@ class PlatformerGame {
         this.canvas = document.getElementById('gameCanvas');
         this.ctx = this.canvas.getContext('2d');
         
-        // 设置画布大小
-        this.canvas.width = 1000;
-        this.canvas.height = 800;
+        // 设置画布大小为更小的尺寸
+        this.canvas.width = 800;  // 从1000减小到800
+        this.canvas.height = 600;  // 从800减小到600
         
         // 游戏状态
         this.gameStarted = false;  // 添加游戏开始状态
@@ -369,9 +369,9 @@ class PlatformerGame {
 
     generatePlatforms() {
         const platforms = [];
-        const platformHeight = 25;
-        const platformSpacing = 100;
-        const shortPlatformWidth = 150;
+        const platformHeight = 20;  // 减小平台高度
+        const platformSpacing = 80;  // 减小平台间距
+        const shortPlatformWidth = 120;  // 减小平台宽度
         
         // 定义可爱的柔和颜色数组
         const platformColors = [
@@ -430,6 +430,13 @@ class PlatformerGame {
     }
 
     setupControls() {
+        // 阻止空格键的默认滚动行为
+        window.addEventListener('keydown', (e) => {
+            if (e.code === 'Space') {
+                e.preventDefault();  // 阻止默认滚动
+            }
+        });
+
         this.keydownHandler = (e) => {
             if (this.keys.hasOwnProperty(e.key)) {
                 this.keys[e.key] = true;
@@ -553,7 +560,7 @@ class PlatformerGame {
         });
 
         // 限制跳跃高度不超过一级台阶
-        const platformSpacing = 100; // 台阶之间的间距
+        const platformSpacing = 80; // 台阶之间的间距
         const maxJumpHeight = platformSpacing + 20; // 允许稍微超过一点以确保能跳上去
         
         // 如果向上速度太大，限制它
