@@ -287,18 +287,17 @@ class PlatformerGame {
     // 添加开始游戏的方法
     startGame() {
         this.gameStarted = true;
-        // 播放开始音效
         this.playSound('start');
         
-        // 初始化游戏对象
         this.platforms = this.generatePlatforms();
 
-        // 初始化出口 - 调整位置以适应新的画布大小
+        // 修正出口位置计算
+        const topPlatformY = this.platforms[6].y;  // 获取最顶层平台的Y坐标
         this.exit = {
-            x: this.canvas.width - 80,  // 从100改为80
-            y: this.canvas.height - 7 * 80 - 60,  // 调整高度计算
-            width: 60,  // 从80改为60
-            height: 60,  // 从80改为60
+            x: this.canvas.width - 70,  // 稍微向左移动一点
+            y: topPlatformY - 60,  // 直接基于最顶层平台的位置
+            width: 60,
+            height: 60,
             image: new Image()
         };
         this.exit.image.src = './images/door.png';
