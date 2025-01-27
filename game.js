@@ -293,17 +293,17 @@ class PlatformerGame {
         // 初始化游戏对象
         this.platforms = this.generatePlatforms();
 
-        // 初始化出口
+        // 初始化出口 - 调整位置以适应新的画布大小
         this.exit = {
-            x: this.canvas.width - 100,
-            y: this.canvas.height - 7 * 100 - 100,
-            width: 80,
-            height: 80,
+            x: this.canvas.width - 80,  // 从100改为80
+            y: this.canvas.height - 7 * 80 - 60,  // 调整高度计算
+            width: 60,  // 从80改为60
+            height: 60,  // 从80改为60
             image: new Image()
         };
         this.exit.image.src = './images/door.png';
 
-        // 初始化障碍物
+        // 初始化障碍物 - 调整大小
         this.obstacles = {
             poison: {
                 list: [],
@@ -313,13 +313,13 @@ class PlatformerGame {
         };
         this.obstacles.poison.image.src = './images/rat poison.png';
 
-        // 初始化Ori数组
+        // 初始化Ori数组 - 调整大小
         this.oris = this.platforms.slice(3, 6).map((platform, index) => ({
-            x: -100,
-            y: platform.y - 80,
-            width: 80,
-            height: 80,
-            speed: 8,
+            x: -80,
+            y: platform.y - 60,
+            width: 60,  // 从80改为60
+            height: 60,  // 从80改为60
+            speed: 6,   // 从8改为6，使移动更适合新的画布大小
             active: false,
             platform: index + 3,
             image: new Image()
@@ -330,14 +330,14 @@ class PlatformerGame {
             ori.image.src = './images/ori.jpeg';
         });
 
-        // 初始化老鼠
+        // 初始化老鼠 - 调整大小
         this.rat = {
             x: 0,
-            y: this.canvas.height - 80,
-            width: 80,
-            height: 80,
-            speed: 7,
-            jumpStrength: 23,
+            y: this.canvas.height - 60,
+            width: 60,  // 从80改为60
+            height: 60,  // 从80改为60
+            speed: 5,   // 从7改为5
+            jumpStrength: 20,  // 从23改为20
             velocityY: 0,
             onGround: true,
             health: 100,
