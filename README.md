@@ -2,6 +2,21 @@
 
 一个有趣的网页小游戏，由HTML5 Canvas开发。
 
+## 目录结构
+
+```
+ori-vs-rat-game/
+├── index.html          # 游戏主页面
+├── game.js            # 游戏逻辑代码
+├── images/            # 图片资源目录
+│   ├── door.png      # 出口门图片
+│   ├── rat poison.png # 老鼠药图片
+│   ├── ori.jpeg      # Ori角色图片
+│   └── rat.jpeg      # 老鼠角色图片
+├── README.md          # 项目说明文档
+└── LICENSE           # MIT许可证
+```
+
 ## 游戏说明
 
 - 使用 ← → 键左右移动
@@ -17,8 +32,9 @@
 ## 如何运行
 
 1. 克隆此仓库
-2. 使用任意Web服务器运行（比如Python的 `python -m http.server 8000`）
-3. 在浏览器中访问 `http://localhost:8000`
+2. 确保所有图片文件都在 `images` 目录中
+3. 使用任意Web服务器运行（比如Python的 `python -m http.server 8000`）
+4. 在浏览器中访问 `http://localhost:8000`
 
 ## 在线试玩
 

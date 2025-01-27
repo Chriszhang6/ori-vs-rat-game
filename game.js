@@ -19,12 +19,12 @@ class PlatformerGame {
         // 初始化出口
         this.exit = {
             x: this.canvas.width - 100,
-            y: this.canvas.height - 7 * 100 - 100,  // 调整间距
-            width: 80,  // 增大尺寸
+            y: this.canvas.height - 7 * 100 - 100,
+            width: 80,
             height: 80,
             image: new Image()
         };
-        this.exit.image.src = 'door.png';
+        this.exit.image.src = './images/door.png';
 
         // 初始化障碍物（只保留老鼠药）
         this.obstacles = {
@@ -34,7 +34,7 @@ class PlatformerGame {
                 damage: 10
             }
         };
-        this.obstacles.poison.image.src = 'rat poison.png';
+        this.obstacles.poison.image.src = './images/rat poison.png';
 
         // 初始化Ori数组，只为第4-6级平台创建Ori
         this.oris = this.platforms.slice(3, 6).map((platform, index) => ({
@@ -50,7 +50,7 @@ class PlatformerGame {
         
         // 加载Ori图片
         this.oris.forEach(ori => {
-            ori.image.src = 'ori.jpeg';
+            ori.image.src = './images/ori.jpeg';
         });
 
         // 初始化老鼠
@@ -66,7 +66,7 @@ class PlatformerGame {
             health: 100,
             image: new Image()
         };
-        this.rat.image.src = 'rat.jpeg';
+        this.rat.image.src = './images/rat.jpeg';
         
         // 添加按键状态跟踪
         this.keys = {
