@@ -31,6 +31,33 @@ class PlatformerGame {
             pressDuration: 300  // 按压动画持续300ms
         };
 
+        // 初始化音效
+        this.sounds = {
+            start: new Audio('./sounds/game_start.wav'),
+            jump: new Audio('./sounds/mouse_jump.wav'),
+            poison: new Audio('./sounds/mouse_hurt.wav'),
+            hit: new Audio('./sounds/tom_hit.wav'),
+            win: new Audio('./sounds/mouse_win.wav')
+        };
+
+        // 预加载所有音效
+        Object.values(this.sounds).forEach(sound => {
+            sound.load();
+            // 设置音量
+            sound.volume = 0.5;
+        });
+
+        // 添加播放跳跃音效的方法
+        this.playJumpSound = () => {
+            this.sounds.jump.currentTime = 0;  // 重置音频到开始位置
+            this.sounds.jump.play();
+            // 1秒后停止播放
+            setTimeout(() => {
+                this.sounds.jump.pause();
+                this.sounds.jump.currentTime = 0;
+            }, 1000);
+        };
+
         // 显示开始界面
         this.showStartScreen();
 
@@ -186,6 +213,8 @@ class PlatformerGame {
     // 添加开始游戏的方法
     startGame() {
         this.gameStarted = true;
+        // 播放开始音效
+        this.sounds.start.play();
         
         // 初始化游戏对象
         this.platforms = this.generatePlatforms();
@@ -369,7 +398,11 @@ class PlatformerGame {
 
         // 更新垂直移动和跳跃
         if (this.keys.Space && this.rat.onGround) {
-            console.log('Space key detected, jumping!');
+            // 只有在真正起跳时才播放音效
+            if (this.rat.velocityY >= 0) {  // 确保不是在空中按空格
+                this.playJumpSound();  // 使用新的播放方法
+                console.log('Space key detected, jumping!');
+            }
             this.rat.velocityY = -this.rat.jumpStrength;
             this.rat.onGround = false;
             this.rat.y -= 1;
@@ -387,6 +420,7 @@ class PlatformerGame {
 
                 // 检查与老鼠的碰撞
                 if (this.checkCollision(this.rat, obstacle)) {
+                    this.sounds.poison.play();
                     this.rat.health -= this.obstacles[type].damage;
 
                     if (this.rat.health <= 0) {
@@ -457,6 +491,7 @@ class PlatformerGame {
                 
                 // 检查与老鼠的碰撞
                 if (this.checkCollision(this.rat, ori)) {
+                    this.sounds.hit.play();
                     // 给老鼠一个水平推力和向上的力
                     if (ori.x < this.rat.x) {
                         this.rat.x += 50;  // 减小水平推力
@@ -503,6 +538,7 @@ class PlatformerGame {
             clearInterval(this.obstacleInterval);
             // 清除所有现有障碍物
             this.obstacles.poison.list = [];
+            this.sounds.win.play();
         }
     }
 
