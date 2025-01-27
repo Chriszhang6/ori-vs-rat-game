@@ -18,11 +18,9 @@ class PlatformerGame {
         // 添加标题图片
         this.titleImages = {
             ori: new Image(),
-            vs: new Image(),
             rat: new Image()
         };
         this.titleImages.ori.src = './images/ori.jpeg';
-        this.titleImages.vs.src = './images/vs.png';  // 需要添加一个vs图片
         this.titleImages.rat.src = './images/rat.jpeg';
 
         // 添加按钮状态
