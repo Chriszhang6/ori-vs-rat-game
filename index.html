@@ -2,7 +2,7 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>Ori大战鼠鼠 | Ori vs Mouse</title>
+    <title>Ori vs Mouse</title>
     <style>
         body {
             display: flex;
@@ -14,6 +14,7 @@
         h1 {
             color: #333;
             margin-bottom: 20px;
+            font-size: 48px;
         }
         #gameCanvas {
             border: 2px solid #333;
@@ -22,40 +23,70 @@
         }
         .instructions {
             background-color: #fff;
-            padding: 15px;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            padding: 20px 30px;
+            border-radius: 15px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
             max-width: 600px;
+            text-align: left;
+            line-height: 1.8;
+            font-size: 16px;
+            color: #444;
+        }
+        .instructions h2 {
+            color: #FF69B4;
             text-align: center;
-            line-height: 1.6;
+            margin-bottom: 15px;
+            font-size: 24px;
         }
-        .bilingual {
-            margin: 10px 0;
-        }
-        .en {
+        .key-icon {
+            display: inline-block;
+            background-color: #f8f9fa;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 2px 8px;
+            margin: 0 4px;
+            font-family: monospace;
+            font-weight: bold;
             color: #666;
-            font-size: 0.9em;
+        }
+        .controls {
+            margin-bottom: 15px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #eee;
+        }
+        .warning {
+            color: #e91e63;
+            font-weight: 500;
+            margin-top: 10px;
+        }
+        .control-item {
+            margin: 8px 0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
         }
     </style>
 </head>
 <body>
-    <h1>
-        <div class="bilingual">
-            <div>Ori大战鼠鼠</div>
-            <div class="en">Ori vs Mouse</div>
-        </div>
-    </h1>
+    <h1>Ori vs Mouse</h1>
     <canvas id="gameCanvas"></canvas>
     <div class="instructions">
-        <div class="bilingual">
-            <p>← → 左右移动，空格键跳跃一级台阶</p>
-            <p class="en">← → Move left/right, SPACE to jump one level</p>
+        <h2>How to Play</h2>
+        <div class="controls">
+            <div class="control-item">
+                <span class="key-icon">→</span> Move right
+            </div>
+            <div class="control-item">
+                <span class="key-icon">←</span> Move left
+            </div>
+            <div class="control-item">
+                <span class="key-icon">SPACE</span> Jump one level
+            </div>
         </div>
-        <div class="bilingual">
-            <p>小心：老鼠药会扣除10%生命值，Ori会撞飞老鼠并掉落</p>
-            <p class="en">Warning: Poison reduces 10% HP, Ori will knock back the mouse</p>
+        <div class="warning">
+            ⚠️ Warning: Poison reduces 10% HP, Dog Ori will knock back the mouse to previous level
         </div>
     </div>
-    <script src="game.js"></script>
+    <script src="game.js?v=2"></script>
 </body>
 </html> 
