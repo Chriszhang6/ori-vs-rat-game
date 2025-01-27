@@ -477,12 +477,12 @@ class PlatformerGame {
 
         // 如果游戏胜利，显示胜利消息
         if (this.gameWon) {
-            this.showEndMessage('老鼠逃亡成功！');
+            this.showEndMessage('老鼠逃亡成功！\nMouse Escaped Successfully!');
         }
 
         // 如果游戏失败，显示失败消息
         if (this.gameOver) {
-            this.showEndMessage('逃亡失败，游戏结束！');
+            this.showEndMessage('逃亡失败，游戏结束！\nEscape Failed, Game Over!');
         }
     }
 
@@ -571,23 +571,28 @@ class PlatformerGame {
         
         // 显示消息
         this.ctx.fillStyle = 'white';
-        this.ctx.font = 'bold 48px Arial';
+        this.ctx.font = 'bold 36px Arial';
         this.ctx.textAlign = 'center';
         this.ctx.textBaseline = 'middle';
-        this.ctx.fillText(message, this.canvas.width / 2, this.canvas.height / 2 - 30);
+        
+        // 分别显示中英文
+        const messages = message.split('\n');
+        this.ctx.fillText(messages[0], this.canvas.width / 2, this.canvas.height / 2 - 50);
+        this.ctx.font = 'bold 24px Arial';  // 英文字体稍小
+        this.ctx.fillText(messages[1], this.canvas.width / 2, this.canvas.height / 2);
 
         // 绘制重玩按钮
         const buttonWidth = 200;
         const buttonHeight = 50;
         const buttonX = this.canvas.width / 2 - buttonWidth / 2;
-        const buttonY = this.canvas.height / 2 + 30;
+        const buttonY = this.canvas.height / 2 + 50;
 
         this.ctx.fillStyle = '#4CAF50';
         this.ctx.fillRect(buttonX, buttonY, buttonWidth, buttonHeight);
         
         this.ctx.fillStyle = 'white';
         this.ctx.font = 'bold 24px Arial';
-        this.ctx.fillText('重玩一次', this.canvas.width / 2, buttonY + buttonHeight / 2);
+        this.ctx.fillText('重玩 / Replay', this.canvas.width / 2, buttonY + buttonHeight / 2);
 
         // 如果还没有添加点击事件监听器，则添加
         if (!this.replayButtonAdded) {

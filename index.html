@@ -2,7 +2,7 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>Ori大战鼠鼠</title>
+    <title>Ori大战鼠鼠 | Ori vs Mouse</title>
     <style>
         body {
             display: flex;
@@ -29,14 +29,32 @@
             text-align: center;
             line-height: 1.6;
         }
+        .bilingual {
+            margin: 10px 0;
+        }
+        .en {
+            color: #666;
+            font-size: 0.9em;
+        }
     </style>
 </head>
 <body>
-    <h1>Ori大战鼠鼠</h1>
+    <h1>
+        <div class="bilingual">
+            <div>Ori大战鼠鼠</div>
+            <div class="en">Ori vs Mouse</div>
+        </div>
+    </h1>
     <canvas id="gameCanvas"></canvas>
     <div class="instructions">
-        <p>← → 左右移动，空格键跳跃一级台阶</p>
-        <p>小心：老鼠药会扣除10%生命值，Ori会撞飞老鼠并掉落</p>
+        <div class="bilingual">
+            <p>← → 左右移动，空格键跳跃一级台阶</p>
+            <p class="en">← → Move left/right, SPACE to jump one level</p>
+        </div>
+        <div class="bilingual">
+            <p>小心：老鼠药会扣除10%生命值，Ori会撞飞老鼠并掉落</p>
+            <p class="en">Warning: Poison reduces 10% HP, Ori will knock back the mouse</p>
+        </div>
     </div>
     <script src="game.js"></script>
 </body>
