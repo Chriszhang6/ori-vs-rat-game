@@ -14,12 +14,34 @@ class PlatformerGame {
         this.gameOver = false;
         this.obstacleInterval = null;
         this.soundsLoaded = false;  // 添加音频加载状态
+        this.imagesLoaded = false;  // 添加图片加载状态
 
         // 添加标题图片
         this.titleImages = {
             ori: new Image(),
             rat: new Image()
         };
+
+        // 计数器跟踪加载的图片数量
+        let loadedImages = 0;
+        const totalImages = Object.keys(this.titleImages).length;
+
+        // 为每个图片添加加载事件
+        Object.values(this.titleImages).forEach(img => {
+            img.onload = () => {
+                loadedImages++;
+                if (loadedImages === totalImages) {
+                    this.imagesLoaded = true;
+                    this.showStartScreen();  // 所有图片加载完成后显示开始界面
+                    console.log('All title images loaded successfully');
+                }
+            };
+            img.onerror = (e) => {
+                console.error('Error loading image:', e);
+            };
+        });
+
+        // 设置图片源
         this.titleImages.ori.src = './images/ori.jpeg';
         this.titleImages.rat.src = './images/rat.jpeg';
 
@@ -146,6 +168,17 @@ class PlatformerGame {
 
     // 添加显示开始界面的方法
     showStartScreen() {
+        if (!this.imagesLoaded) {
+            // 如果图片未加载完成，显示加载中的信息
+            this.ctx.fillStyle = '#E0F7FA';
+            this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+            this.ctx.fillStyle = '#333';
+            this.ctx.font = 'bold 24px Arial';
+            this.ctx.textAlign = 'center';
+            this.ctx.fillText('Loading...', this.canvas.width / 2, this.canvas.height / 2);
+            return;
+        }
+
         // 绘制渐变背景
         const gradient = this.ctx.createLinearGradient(0, 0, 0, this.canvas.height);
         gradient.addColorStop(0, '#E0F7FA');
@@ -397,23 +430,26 @@ class PlatformerGame {
     }
 
     setupControls() {
-        document.addEventListener('keydown', (e) => {
+        this.keydownHandler = (e) => {
             if (this.keys.hasOwnProperty(e.key)) {
                 this.keys[e.key] = true;
             }
             if (e.key === ' ') {  // 处理空格字符
                 this.keys.Space = true;
             }
-        });
+        };
 
-        document.addEventListener('keyup', (e) => {
+        this.keyupHandler = (e) => {
             if (this.keys.hasOwnProperty(e.key)) {
                 this.keys[e.key] = false;
             }
             if (e.key === ' ') {  // 处理空格字符
                 this.keys.Space = false;
             }
-        });
+        };
+
+        document.addEventListener('keydown', this.keydownHandler);
+        document.addEventListener('keyup', this.keyupHandler);
     }
 
     startGameLoop() {
@@ -839,9 +875,13 @@ class PlatformerGame {
         const buttonX = this.canvas.width / 2 - buttonWidth / 2;
         const buttonY = this.canvas.height / 2 + 50;
 
+        // 绘制按钮背景
         this.ctx.fillStyle = '#4CAF50';
-        this.ctx.fillRect(buttonX, buttonY, buttonWidth, buttonHeight);
+        this.ctx.beginPath();
+        this.ctx.roundRect(buttonX, buttonY, buttonWidth, buttonHeight, 10);
+        this.ctx.fill();
         
+        // 绘制按钮文字
         this.ctx.fillStyle = 'white';
         this.ctx.font = 'bold 24px Arial';
         this.ctx.fillText('Replay', this.canvas.width / 2, buttonY + buttonHeight / 2);
@@ -857,8 +897,23 @@ class PlatformerGame {
                 if (x >= buttonX && x <= buttonX + buttonWidth &&
                     y >= buttonY && y <= buttonY + buttonHeight &&
                     (this.gameWon || this.gameOver)) {
-                    // 重新开始游戏
-                    new PlatformerGame();
+                    // 清除所有定时器
+                    clearInterval(this.updateInterval);
+                    clearInterval(this.obstacleInterval);
+                    
+                    // 移除所有事件监听器
+                    document.removeEventListener('keydown', this.keydownHandler);
+                    document.removeEventListener('keyup', this.keyupHandler);
+                    
+                    // 重置游戏状态
+                    this.gameStarted = false;
+                    this.gameWon = false;
+                    this.gameOver = false;
+                    
+                    // 创建新的游戏实例
+                    const game = new PlatformerGame();
+                    // 显示开始界面
+                    game.showStartScreen();
                 }
             });
             this.replayButtonAdded = true;
