@@ -34,11 +34,11 @@ class PlatformerGame {
 
         // 初始化音效
         this.sounds = {
-            start: new Audio('/ori-vs-rat/sounds/game_start.wav'),
-            jump: new Audio('/ori-vs-rat/sounds/mouse_jump.wav'),
-            poison: new Audio('/ori-vs-rat/sounds/mouse_hurt.wav'),
-            hit: new Audio('/ori-vs-rat/sounds/tom_hit.wav'),
-            win: new Audio('/ori-vs-rat/sounds/mouse_win.wav')
+            start: new Audio('/ori-vs-rat-game/sounds/game_start.wav'),
+            jump: new Audio('/ori-vs-rat-game/sounds/mouse_jump.wav'),
+            poison: new Audio('/ori-vs-rat-game/sounds/mouse_hurt.wav'),
+            hit: new Audio('/ori-vs-rat-game/sounds/tom_hit.wav'),
+            win: new Audio('/ori-vs-rat-game/sounds/mouse_win.wav')
         };
 
         // 添加音频加载错误处理的详细日志
