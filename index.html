@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Ori大战鼠鼠</title>
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background-color: #f0f0f0;
+            font-family: Arial, sans-serif;
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+        #gameCanvas {
+            border: 2px solid #333;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+        .instructions {
+            background-color: #fff;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            max-width: 600px;
+            text-align: center;
+            line-height: 1.6;
+        }
+    </style>
+</head>
+<body>
+    <h1>Ori大战鼠鼠</h1>
+    <canvas id="gameCanvas"></canvas>
+    <div class="instructions">
+        <p>← → 左右移动，空格键跳跃一级台阶</p>
+        <p>小心：老鼠药会扣除10%生命值，Ori会撞飞老鼠并掉落</p>
+    </div>
+    <script src="game.js"></script>
+</body>
+</html> 
