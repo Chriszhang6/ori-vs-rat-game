@@ -9,11 +9,185 @@ class PlatformerGame {
         this.canvas.height = 800;
         
         // 游戏状态
+        this.gameStarted = false;  // 添加游戏开始状态
         this.gameWon = false;
-        this.gameOver = false;  // 添加游戏结束状态
+        this.gameOver = false;
         this.obstacleInterval = null;
 
-        // 定义动态平台
+        // 添加标题图片
+        this.titleImages = {
+            ori: new Image(),
+            vs: new Image(),
+            rat: new Image()
+        };
+        this.titleImages.ori.src = './images/ori.jpeg';
+        this.titleImages.vs.src = './images/vs.png';  // 需要添加一个vs图片
+        this.titleImages.rat.src = './images/rat.jpeg';
+
+        // 添加按钮状态
+        this.startButton = {
+            isPressed: false,
+            pressStartTime: 0,
+            pressDuration: 300  // 按压动画持续300ms
+        };
+
+        // 显示开始界面
+        this.showStartScreen();
+
+        // 修改点击事件
+        this.canvas.addEventListener('mousedown', (event) => {
+            if (!this.gameStarted) {
+                const rect = this.canvas.getBoundingClientRect();
+                const x = event.clientX - rect.left;
+                const y = event.clientY - rect.top;
+
+                const distance = Math.sqrt(
+                    Math.pow(x - this.startButtonBounds.x, 2) +
+                    Math.pow(y - this.startButtonBounds.y, 2)
+                );
+
+                if (distance <= this.startButtonBounds.radius) {
+                    this.startButton.isPressed = true;
+                    this.startButton.pressStartTime = Date.now();
+                    // 重绘开始界面以显示按压效果
+                    this.showStartScreen();
+                }
+            }
+        });
+
+        this.canvas.addEventListener('mouseup', (event) => {
+            if (!this.gameStarted && this.startButton.isPressed) {
+                const rect = this.canvas.getBoundingClientRect();
+                const x = event.clientX - rect.left;
+                const y = event.clientY - rect.top;
+
+                const distance = Math.sqrt(
+                    Math.pow(x - this.startButtonBounds.x, 2) +
+                    Math.pow(y - this.startButtonBounds.y, 2)
+                );
+
+                if (distance <= this.startButtonBounds.radius) {
+                    // 等待按压动画完成后开始游戏
+                    setTimeout(() => this.startGame(), 
+                        Math.max(0, this.startButton.pressDuration - (Date.now() - this.startButton.pressStartTime)));
+                }
+                this.startButton.isPressed = false;
+            }
+        });
+    }
+
+    // 添加显示开始界面的方法
+    showStartScreen() {
+        // 绘制渐变背景
+        const gradient = this.ctx.createLinearGradient(0, 0, 0, this.canvas.height);
+        gradient.addColorStop(0, '#E0F7FA');
+        gradient.addColorStop(1, '#B2EBF2');
+        this.ctx.fillStyle = gradient;
+        this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+
+        // 绘制装饰性的云朵
+        this.drawCloud(100, 100, 80);
+        this.drawCloud(400, 200, 100);
+        this.drawCloud(700, 150, 90);
+
+        // 绘制圆形开始按钮
+        const buttonRadius = 60;
+        const buttonX = this.canvas.width / 2;
+        const buttonY = this.canvas.height / 2;
+
+        // 绘制Ori和老鼠图片
+        const characterSize = 160;  // 增大到2倍
+        const spacing = 200;  // 增加间距
+
+        // 绘制Ori（左侧）
+        this.drawCircularImage(
+            this.titleImages.ori,
+            buttonX - spacing - characterSize,
+            buttonY - characterSize/2,
+            characterSize
+        );
+        
+        // 绘制老鼠（右侧）
+        this.drawCircularImage(
+            this.titleImages.rat,
+            buttonX + spacing,
+            buttonY - characterSize/2,
+            characterSize
+        );
+
+        // 计算按压效果
+        let scale = 1;
+        let alpha = 1;
+        if (this.startButton.isPressed) {
+            const elapsed = Date.now() - this.startButton.pressStartTime;
+            const progress = Math.min(elapsed / this.startButton.pressDuration, 1);
+            scale = 1 - 0.1 * progress;  // 按下时缩小到90%
+            alpha = 0.8;  // 按下时降低透明度
+        }
+
+        // 外圈光晕效果
+        const glowGradient = this.ctx.createRadialGradient(
+            buttonX, buttonY, buttonRadius * scale - 10,
+            buttonX, buttonY, buttonRadius * scale + 10
+        );
+        glowGradient.addColorStop(0, `rgba(255, 182, 193, ${0.6 * alpha})`);
+        glowGradient.addColorStop(1, 'rgba(255, 182, 193, 0)');
+        
+        this.ctx.fillStyle = glowGradient;
+        this.ctx.beginPath();
+        this.ctx.arc(buttonX, buttonY, buttonRadius * scale + 10, 0, Math.PI * 2);
+        this.ctx.fill();
+
+        // 按钮主体渐变
+        const buttonGradient = this.ctx.createRadialGradient(
+            buttonX - buttonRadius * scale/3, 
+            buttonY - buttonRadius * scale/3, 
+            buttonRadius * scale/4,
+            buttonX, buttonY, buttonRadius * scale
+        );
+        buttonGradient.addColorStop(0, `rgba(255, 182, 193, ${alpha})`);
+        buttonGradient.addColorStop(1, `rgba(255, 105, 180, ${alpha})`);
+
+        // 按钮阴影
+        this.ctx.shadowColor = 'rgba(0, 0, 0, 0.3)';
+        this.ctx.shadowBlur = this.startButton.isPressed ? 5 : 10;
+        this.ctx.shadowOffsetY = this.startButton.isPressed ? 2 : 5;
+
+        // 绘制圆形按钮
+        this.ctx.fillStyle = buttonGradient;
+        this.ctx.beginPath();
+        this.ctx.arc(buttonX, buttonY, buttonRadius * scale, 0, Math.PI * 2);
+        this.ctx.fill();
+
+        // 重置阴影
+        this.ctx.shadowColor = 'transparent';
+        this.ctx.shadowBlur = 0;
+        this.ctx.shadowOffsetY = 0;
+
+        // 按钮文字
+        this.ctx.fillStyle = 'white';
+        this.ctx.font = `bold ${24 * scale}px Arial`;
+        this.ctx.textAlign = 'center';
+        this.ctx.fillText('Start', buttonX, buttonY + 8 * scale);
+
+        // 更新点击检测区域
+        this.startButtonBounds = {
+            x: buttonX,
+            y: buttonY,
+            radius: buttonRadius
+        };
+
+        // 如果按钮被按下，继续更新动画
+        if (this.startButton.isPressed) {
+            requestAnimationFrame(() => this.showStartScreen());
+        }
+    }
+
+    // 添加开始游戏的方法
+    startGame() {
+        this.gameStarted = true;
+        
+        // 初始化游戏对象
         this.platforms = this.generatePlatforms();
 
         // 初始化出口
@@ -26,7 +200,7 @@ class PlatformerGame {
         };
         this.exit.image.src = './images/door.png';
 
-        // 初始化障碍物（只保留老鼠药）
+        // 初始化障碍物
         this.obstacles = {
             poison: {
                 list: [],
@@ -36,15 +210,15 @@ class PlatformerGame {
         };
         this.obstacles.poison.image.src = './images/rat poison.png';
 
-        // 初始化Ori数组，只为第4-6级平台创建Ori
+        // 初始化Ori数组
         this.oris = this.platforms.slice(3, 6).map((platform, index) => ({
-            x: -100,  // 初始位置在屏幕左侧外
-            y: platform.y - 80,  // 在平台上方
+            x: -100,
+            y: platform.y - 80,
             width: 80,
             height: 80,
             speed: 8,
             active: false,
-            platform: index + 3,  // 调整平台索引以匹配实际的平台编号
+            platform: index + 3,
             image: new Image()
         }));
         
@@ -173,10 +347,12 @@ class PlatformerGame {
     }
 
     startGameLoop() {
+        if (this.gameStarted) {
         this.updateInterval = setInterval(() => {
             this.updateMovement();
         }, 16);  // 约60fps的更新频率
         this.gameLoop();
+        }
     }
 
     updateMovement() {
@@ -338,7 +514,9 @@ class PlatformerGame {
     }
 
     gameLoop() {
+        if (this.gameStarted) {
         this.draw();
+        }
         requestAnimationFrame(() => this.gameLoop());
     }
 
@@ -477,12 +655,12 @@ class PlatformerGame {
 
         // 如果游戏胜利，显示胜利消息
         if (this.gameWon) {
-            this.showEndMessage('老鼠逃亡成功！\nMouse Escaped Successfully!');
+            this.showEndMessage('Mouse Escaped Successfully!');
         }
 
         // 如果游戏失败，显示失败消息
         if (this.gameOver) {
-            this.showEndMessage('逃亡失败，游戏结束！\nEscape Failed, Game Over!');
+            this.showEndMessage('Game Over!');
         }
     }
 
@@ -575,11 +753,8 @@ class PlatformerGame {
         this.ctx.textAlign = 'center';
         this.ctx.textBaseline = 'middle';
         
-        // 分别显示中英文
-        const messages = message.split('\n');
-        this.ctx.fillText(messages[0], this.canvas.width / 2, this.canvas.height / 2 - 50);
-        this.ctx.font = 'bold 24px Arial';  // 英文字体稍小
-        this.ctx.fillText(messages[1], this.canvas.width / 2, this.canvas.height / 2);
+        // Display only English message
+        this.ctx.fillText(message, this.canvas.width / 2, this.canvas.height / 2);
 
         // 绘制重玩按钮
         const buttonWidth = 200;
@@ -592,7 +767,7 @@ class PlatformerGame {
         
         this.ctx.fillStyle = 'white';
         this.ctx.font = 'bold 24px Arial';
-        this.ctx.fillText('重玩 / Replay', this.canvas.width / 2, buttonY + buttonHeight / 2);
+        this.ctx.fillText('Replay', this.canvas.width / 2, buttonY + buttonHeight / 2);
 
         // 如果还没有添加点击事件监听器，则添加
         if (!this.replayButtonAdded) {
