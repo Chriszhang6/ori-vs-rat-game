@@ -34,12 +34,20 @@ class PlatformerGame {
 
         // 初始化音效
         this.sounds = {
-            start: new Audio('./sounds/game_start.wav'),
-            jump: new Audio('./sounds/mouse_jump.wav'),
-            poison: new Audio('./sounds/mouse_hurt.wav'),
-            hit: new Audio('./sounds/tom_hit.wav'),
-            win: new Audio('./sounds/mouse_win.wav')
+            start: new Audio('../sounds/game_start.wav'),
+            jump: new Audio('../sounds/mouse_jump.wav'),
+            poison: new Audio('../sounds/mouse_hurt.wav'),
+            hit: new Audio('../sounds/tom_hit.wav'),
+            win: new Audio('../sounds/mouse_win.wav')
         };
+
+        // 添加音频加载错误处理的详细日志
+        Object.entries(this.sounds).forEach(([name, sound]) => {
+            sound.addEventListener('error', (e) => {
+                console.error(`Error loading sound ${name}:`, e);
+                console.log('Source:', sound.src);
+            });
+        });
 
         // 预加载所有音效
         let loadedSounds = 0;
@@ -48,6 +56,7 @@ class PlatformerGame {
         Object.values(this.sounds).forEach(sound => {
             sound.addEventListener('canplaythrough', () => {
                 loadedSounds++;
+                console.log(`Loaded sound ${loadedSounds}/${totalSounds}`);
                 if (loadedSounds === totalSounds) {
                     this.soundsLoaded = true;
                     console.log('All sounds loaded successfully');
