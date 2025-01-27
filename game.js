@@ -13,6 +13,7 @@ class PlatformerGame {
         this.gameWon = false;
         this.gameOver = false;
         this.obstacleInterval = null;
+        this.soundsLoaded = false;  // 添加音频加载状态
 
         // 添加标题图片
         this.titleImages = {
@@ -41,21 +42,51 @@ class PlatformerGame {
         };
 
         // 预加载所有音效
+        let loadedSounds = 0;
+        const totalSounds = Object.keys(this.sounds).length;
+        
         Object.values(this.sounds).forEach(sound => {
+            sound.addEventListener('canplaythrough', () => {
+                loadedSounds++;
+                if (loadedSounds === totalSounds) {
+                    this.soundsLoaded = true;
+                    console.log('All sounds loaded successfully');
+                }
+            });
+            sound.addEventListener('error', (e) => {
+                console.error('Error loading sound:', e);
+            });
             sound.load();
-            // 设置音量
             sound.volume = 0.5;
         });
 
+        // 添加播放音效的方法
+        this.playSound = (soundName) => {
+            if (this.soundsLoaded && this.sounds[soundName]) {
+                try {
+                    const sound = this.sounds[soundName];
+                    sound.currentTime = 0;
+                    sound.play().catch(e => console.error('Error playing sound:', e));
+                } catch (e) {
+                    console.error('Error playing sound:', e);
+                }
+            }
+        };
+
         // 添加播放跳跃音效的方法
         this.playJumpSound = () => {
-            this.sounds.jump.currentTime = 0;  // 重置音频到开始位置
-            this.sounds.jump.play();
-            // 1秒后停止播放
-            setTimeout(() => {
-                this.sounds.jump.pause();
-                this.sounds.jump.currentTime = 0;
-            }, 1000);
+            if (this.soundsLoaded) {
+                const sound = this.sounds.jump;
+                sound.currentTime = 0;
+                sound.play()
+                    .then(() => {
+                        setTimeout(() => {
+                            sound.pause();
+                            sound.currentTime = 0;
+                        }, 300);  // 减少到300毫秒
+                    })
+                    .catch(e => console.error('Error playing jump sound:', e));
+            }
         };
 
         // 显示开始界面
@@ -214,7 +245,7 @@ class PlatformerGame {
     startGame() {
         this.gameStarted = true;
         // 播放开始音效
-        this.sounds.start.play();
+        this.playSound('start');
         
         // 初始化游戏对象
         this.platforms = this.generatePlatforms();
@@ -420,7 +451,7 @@ class PlatformerGame {
 
                 // 检查与老鼠的碰撞
                 if (this.checkCollision(this.rat, obstacle)) {
-                    this.sounds.poison.play();
+                    this.playSound('poison');
                     this.rat.health -= this.obstacles[type].damage;
 
                     if (this.rat.health <= 0) {
@@ -491,7 +522,7 @@ class PlatformerGame {
                 
                 // 检查与老鼠的碰撞
                 if (this.checkCollision(this.rat, ori)) {
-                    this.sounds.hit.play();
+                    this.playSound('hit');
                     // 给老鼠一个水平推力和向上的力
                     if (ori.x < this.rat.x) {
                         this.rat.x += 50;  // 减小水平推力
@@ -531,6 +562,7 @@ class PlatformerGame {
 
         // 检查是否到达出口
         if (this.checkCollision(this.rat, this.exit)) {
+            this.playSound('win');
             console.log('You win!');
             this.gameWon = true;
             // 清除所有游戏循环和障碍物生成
@@ -538,7 +570,6 @@ class PlatformerGame {
             clearInterval(this.obstacleInterval);
             // 清除所有现有障碍物
             this.obstacles.poison.list = [];
-            this.sounds.win.play();
         }
     }
 
