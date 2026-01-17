@@ -7,13 +7,34 @@ class PlatformerGame {
         // 设置画布大小为更小的尺寸
         this.canvas.width = 800;  // 从1000减小到800
         this.canvas.height = 600;  // 从800减小到600
+
+        // 计分与视觉状态
+        this.score = 0;
+        this.highScore = Number(localStorage.getItem('oriVsRatHighScore')) || 0;
+        this.scorePerSecond = 10;
+        this.startTime = null;
+        this.endTime = null;
+        this.lastScoreTimestamp = null;
+        this.maxLevelReached = 0;
+        this.scorePopups = [];
+        this.scoreFinalized = false;
+        this.ambientParticles = this.createAmbientParticles(36);
+        this.difficulty = {
+            level: 1,
+            obstacleSpawnChance: 0.4,
+            obstacleSpeedBoost: 0,
+            platformSpeedMultiplier: 1,
+            oriSpawnChance: 0.15,
+            oriSpeedMultiplier: 1
+        };
+        this.exitHoldDuration = 900;
+        this.exitHoldStart = null;
         
         // 游戏状态
         this.gameStarted = false;  // 添加游戏开始状态
         this.gameWon = false;
         this.gameOver = false;
         this.obstacleInterval = null;
-        this.soundsLoaded = false;  // 添加音频加载状态
         this.imagesLoaded = false;  // 添加图片加载状态
 
         // 添加标题图片
@@ -52,73 +73,66 @@ class PlatformerGame {
             pressDuration: 300  // 按压动画持续300ms
         };
 
-        // 初始化音效
-        this.sounds = {
-            start: new Audio('/ori-vs-rat-game/sounds/game_start.wav'),
-            jump: new Audio('/ori-vs-rat-game/sounds/mouse_jump.wav'),
-            poison: new Audio('/ori-vs-rat-game/sounds/mouse_hurt.wav'),
-            hit: new Audio('/ori-vs-rat-game/sounds/tom_hit.wav'),
-            win: new Audio('/ori-vs-rat-game/sounds/mouse_win.wav')
+        // 初始化合成音效（Web Audio）
+        this.audioCtx = null;
+        this.soundEnabled = true;
+
+        this.initAudioContext = () => {
+            if (!this.audioCtx) {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                this.audioCtx = new AudioContext();
+            }
+            if (this.audioCtx.state === 'suspended') {
+                this.audioCtx.resume();
+            }
         };
 
-        // 添加音频加载错误处理的详细日志
-        Object.entries(this.sounds).forEach(([name, sound]) => {
-            sound.addEventListener('error', (e) => {
-                console.error(`Error loading sound ${name}:`, {
-                    error: e,
-                    src: sound.src,
-                    absolutePath: new URL(sound.src, window.location.href).href
-                });
-            });
-        });
+        this.playTone = (config) => {
+            if (!this.soundEnabled) return;
+            this.initAudioContext();
+            if (!this.audioCtx) return;
 
-        // 预加载所有音效
-        let loadedSounds = 0;
-        const totalSounds = Object.keys(this.sounds).length;
-        
-        Object.values(this.sounds).forEach(sound => {
-            sound.addEventListener('canplaythrough', () => {
-                loadedSounds++;
-                console.log(`Loaded sound ${loadedSounds}/${totalSounds}`);
-                if (loadedSounds === totalSounds) {
-                    this.soundsLoaded = true;
-                    console.log('All sounds loaded successfully');
-                }
-            });
-            sound.addEventListener('error', (e) => {
-                console.error('Error loading sound:', e);
-            });
-            sound.load();
-            sound.volume = 0.5;
-        });
+            const now = this.audioCtx.currentTime;
+            const osc = this.audioCtx.createOscillator();
+            const gain = this.audioCtx.createGain();
 
-        // 添加播放音效的方法
+            osc.type = config.type || 'sine';
+            osc.frequency.setValueAtTime(config.frequency || 440, now);
+            if (config.sweep) {
+                osc.frequency.exponentialRampToValueAtTime(config.sweep, now + (config.duration || 0.2));
+            }
+
+            gain.gain.setValueAtTime(0.0001, now);
+            gain.gain.exponentialRampToValueAtTime(config.volume || 0.2, now + 0.02);
+            gain.gain.exponentialRampToValueAtTime(0.0001, now + (config.duration || 0.2));
+
+            osc.connect(gain).connect(this.audioCtx.destination);
+            osc.start(now);
+            osc.stop(now + (config.duration || 0.2));
+        };
+
         this.playSound = (soundName) => {
-            if (this.soundsLoaded && this.sounds[soundName]) {
-                try {
-                    const sound = this.sounds[soundName];
-                    sound.currentTime = 0;
-                    sound.play().catch(e => console.error('Error playing sound:', e));
-                } catch (e) {
-                    console.error('Error playing sound:', e);
-                }
+            switch (soundName) {
+                case 'start':
+                    this.playTone({ type: 'triangle', frequency: 440, sweep: 660, duration: 0.35, volume: 0.18 });
+                    break;
+                case 'poison':
+                    this.playTone({ type: 'square', frequency: 260, sweep: 180, duration: 0.25, volume: 0.2 });
+                    break;
+                case 'hit':
+                    this.playTone({ type: 'sawtooth', frequency: 180, sweep: 90, duration: 0.2, volume: 0.22 });
+                    break;
+                case 'win':
+                    this.playTone({ type: 'triangle', frequency: 523.25, sweep: 783.99, duration: 0.45, volume: 0.2 });
+                    this.playTone({ type: 'triangle', frequency: 659.25, sweep: 987.77, duration: 0.45, volume: 0.18 });
+                    break;
+                default:
+                    break;
             }
         };
 
-        // 添加播放跳跃音效的方法
         this.playJumpSound = () => {
-            if (this.soundsLoaded) {
-                const sound = this.sounds.jump;
-                sound.currentTime = 0;
-                sound.play()
-                    .then(() => {
-                        setTimeout(() => {
-                            sound.pause();
-                            sound.currentTime = 0;
-                        }, 300);  // 减少到300毫秒
-                    })
-                    .catch(e => console.error('Error playing jump sound:', e));
-            }
+            this.playTone({ type: 'sine', frequency: 520, sweep: 880, duration: 0.22, volume: 0.16 });
         };
 
         // 显示开始界面
@@ -288,16 +302,27 @@ class PlatformerGame {
     startGame() {
         this.gameStarted = true;
         this.playSound('start');
+
+        // 计分初始化
+        this.score = 0;
+        this.startTime = Date.now();
+        this.endTime = null;
+        this.lastScoreTimestamp = performance.now();
+        this.maxLevelReached = 0;
+        this.scorePopups = [];
+        this.scoreFinalized = false;
+        this.exitHoldStart = null;
+        this.difficulty.level = 1;
         
         this.platforms = this.generatePlatforms();
 
         // 修正出口位置计算
         const topPlatformY = this.platforms[6].y;  // 获取最顶层平台的Y坐标
         this.exit = {
-            x: this.canvas.width - 70,  // 稍微向左移动一点
-            y: topPlatformY - 60,  // 直接基于最顶层平台的位置
-            width: 60,
-            height: 60,
+            x: this.canvas.width - 58,  // 进一步内收，避免贴边
+            y: topPlatformY - 54,  // 让门与平台保持更自然的比例
+            width: 48,
+            height: 48,
             image: new Image()
         };
         this.exit.image.src = './images/door.png';
@@ -414,14 +439,16 @@ class PlatformerGame {
     generateObstacles() {
         // 保存计时器引用
         this.obstacleInterval = setInterval(() => {
-            if (Math.random() < 0.4) {  // 40%的概率生成老鼠药
+            const spawnChance = this.difficulty?.obstacleSpawnChance ?? 0.4;
+            if (Math.random() < spawnChance) {  // 动态概率生成老鼠药
+                const speedBoost = this.difficulty?.obstacleSpeedBoost ?? 0;
                 const obstacle = {
-                    x: Math.random() * (this.canvas.width - 80),
+                    x: Math.random() * (this.canvas.width - 50),
                     y: 0,
-                    width: 80,
-                    height: 80,
-                    velocityX: (Math.random() - 0.5) * 5,
-                    velocityY: 3 + Math.random() * 2
+                    width: 50,
+                    height: 50,
+                    velocityX: (Math.random() - 0.5) * (5 + speedBoost),
+                    velocityY: 3 + Math.random() * (2 + speedBoost)
                 };
                 this.obstacles.poison.list.push(obstacle);
             }
@@ -470,6 +497,17 @@ class PlatformerGame {
     updateMovement() {
         // 移除麻痹状态检查，直接进行移动更新
         let onPlatform = false;
+
+        // 计分：存活时间
+        const now = performance.now();
+        if (this.lastScoreTimestamp === null) {
+            this.lastScoreTimestamp = now;
+        }
+        const deltaSeconds = (now - this.lastScoreTimestamp) / 1000;
+        this.lastScoreTimestamp = now;
+        if (!this.gameOver && !this.gameWon) {
+            this.score += deltaSeconds * this.scorePerSecond;
+        }
         
         // 更新水平移动
         if (this.keys.ArrowRight) {
@@ -505,6 +543,7 @@ class PlatformerGame {
                 if (this.checkCollision(this.rat, obstacle)) {
                     this.playSound('poison');
                     this.rat.health -= this.obstacles[type].damage;
+                    this.addScore(-20, obstacle.x + obstacle.width / 2, obstacle.y + obstacle.height / 2);
 
                     if (this.rat.health <= 0) {
                         console.log('Game Over!');
@@ -512,6 +551,7 @@ class PlatformerGame {
                         clearInterval(this.updateInterval);
                         clearInterval(this.obstacleInterval);
                         this.obstacles.poison.list = [];
+                        this.finalizeScore('lose');
                     }
                     
                     // 移除碰撞的障碍物
@@ -525,9 +565,13 @@ class PlatformerGame {
             });
         });
 
+        // 更新难度
+        this.updateDifficulty();
+
         // 更新平台位置
         this.platforms.forEach(platform => {
-            platform.x += platform.velocityX;
+            const speedMultiplier = this.difficulty?.platformSpeedMultiplier ?? 1;
+            platform.x += platform.velocityX * speedMultiplier;
             if (platform.x < 0 || platform.x + platform.width > this.canvas.width) {
                 platform.velocityX *= -1;
             }
@@ -537,7 +581,7 @@ class PlatformerGame {
         this.rat.onGround = false;
 
         // 检查平台碰撞
-        this.platforms.forEach(platform => {
+        this.platforms.forEach((platform, index) => {
             if (this.checkCollision(this.rat, platform)) {
                 // 只有当老鼠从上方落下时才能站在平台上
                 const ratBottom = this.rat.y + this.rat.height;
@@ -549,6 +593,12 @@ class PlatformerGame {
                     this.rat.y = platform.y - this.rat.height;
                     this.rat.velocityY = 0;
                     this.rat.onGround = true;
+
+                    // 到达新高度奖励
+                    if (index > this.maxLevelReached) {
+                        this.maxLevelReached = index;
+                        this.addScore(60, this.rat.x + this.rat.width / 2, platform.y);
+                    }
                     
                     // 只在非麻痹状态下跟随平台移动
                     if (!this.keys.ArrowRight && !this.keys.ArrowLeft) {
@@ -570,11 +620,13 @@ class PlatformerGame {
         // 更新Ori的位置
         this.oris.forEach(ori => {
             if (ori.active) {
-                ori.x += ori.speed;
+                const speedMultiplier = this.difficulty?.oriSpeedMultiplier ?? 1;
+                ori.x += ori.speed * speedMultiplier;
                 
                 // 检查与老鼠的碰撞
                 if (this.checkCollision(this.rat, ori)) {
                     this.playSound('hit');
+                    this.addScore(-15, this.rat.x + this.rat.width / 2, this.rat.y);
                     // 给老鼠一个水平推力和向上的力
                     if (ori.x < this.rat.x) {
                         this.rat.x += 50;  // 减小水平推力
@@ -612,16 +664,24 @@ class PlatformerGame {
             this.rat.onGround = true;
         }
 
-        // 检查是否到达出口
+        // 检查是否到达出口（需要停留一小段时间）
         if (this.checkCollision(this.rat, this.exit)) {
-            this.playSound('win');
-            console.log('You win!');
-            this.gameWon = true;
-            // 清除所有游戏循环和障碍物生成
-            clearInterval(this.updateInterval);
-            clearInterval(this.obstacleInterval);
-            // 清除所有现有障碍物
-            this.obstacles.poison.list = [];
+            if (!this.exitHoldStart) {
+                this.exitHoldStart = Date.now();
+            }
+            if (Date.now() - this.exitHoldStart >= this.exitHoldDuration) {
+                this.playSound('win');
+                console.log('You win!');
+                this.gameWon = true;
+                // 清除所有游戏循环和障碍物生成
+                clearInterval(this.updateInterval);
+                clearInterval(this.obstacleInterval);
+                // 清除所有现有障碍物
+                this.obstacles.poison.list = [];
+                this.finalizeScore('win');
+            }
+        } else {
+            this.exitHoldStart = null;
         }
     }
 
@@ -653,6 +713,136 @@ class PlatformerGame {
         this.ctx.restore();
     }
 
+    createAmbientParticles(count) {
+        return Array.from({ length: count }, () => ({
+            x: Math.random() * this.canvas.width,
+            y: Math.random() * this.canvas.height,
+            radius: 1 + Math.random() * 2.5,
+            speed: 0.2 + Math.random() * 0.5,
+            drift: (Math.random() - 0.5) * 0.3,
+            alpha: 0.2 + Math.random() * 0.5
+        }));
+    }
+
+    updateAmbientParticles() {
+        this.ambientParticles.forEach(particle => {
+            particle.y -= particle.speed;
+            particle.x += particle.drift;
+
+            if (particle.y < -10) {
+                particle.y = this.canvas.height + 10;
+                particle.x = Math.random() * this.canvas.width;
+            }
+
+            if (particle.x < -10) particle.x = this.canvas.width + 10;
+            if (particle.x > this.canvas.width + 10) particle.x = -10;
+        });
+    }
+
+    drawAmbientParticles() {
+        this.ctx.save();
+        this.ambientParticles.forEach(particle => {
+            this.ctx.fillStyle = `rgba(255, 255, 255, ${particle.alpha})`;
+            this.ctx.beginPath();
+            this.ctx.arc(particle.x, particle.y, particle.radius, 0, Math.PI * 2);
+            this.ctx.fill();
+        });
+        this.ctx.restore();
+    }
+
+    addScore(points, x = this.rat.x + this.rat.width / 2, y = this.rat.y) {
+        if (!Number.isFinite(points) || points === 0) return;
+        this.score = Math.max(0, this.score + points);
+        this.scorePopups.push({
+            x,
+            y,
+            text: points > 0 ? `+${Math.round(points)}` : `${Math.round(points)}`,
+            life: 60,
+            alpha: 1,
+            color: points > 0 ? '#4CAF50' : '#E53935'
+        });
+    }
+
+    updateHighScore() {
+        const current = Math.floor(this.score);
+        if (current > this.highScore) {
+            this.highScore = current;
+            localStorage.setItem('oriVsRatHighScore', String(current));
+        }
+    }
+
+    finalizeScore(result) {
+        if (this.scoreFinalized) return;
+        this.scoreFinalized = true;
+        this.endTime = Date.now();
+
+        if (result === 'win') {
+            const elapsed = (Date.now() - this.startTime) / 1000;
+            const timeBonus = Math.max(0, Math.floor(900 - elapsed * 8));
+            const healthBonus = Math.floor(this.rat.health * 6);
+            const totalBonus = timeBonus + healthBonus;
+            if (totalBonus > 0) {
+                this.addScore(totalBonus, this.exit.x + this.exit.width / 2, this.exit.y);
+            }
+        }
+
+        this.updateHighScore();
+    }
+
+    drawScoreHUD() {
+        const padding = 14;
+        const panelWidth = 200;
+        const panelHeight = 72;
+        const x = padding;
+        const y = padding;
+
+        this.ctx.save();
+        this.ctx.fillStyle = 'rgba(255, 255, 255, 0.78)';
+        this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)';
+        this.ctx.lineWidth = 1;
+        this.ctx.beginPath();
+        this.ctx.roundRect(x, y, panelWidth, panelHeight, 14);
+        this.ctx.fill();
+        this.ctx.stroke();
+
+        const scoreValue = Math.floor(this.score);
+        const endReference = this.endTime || Date.now();
+        const timeValue = this.startTime ? (endReference - this.startTime) / 1000 : 0;
+
+        this.ctx.fillStyle = '#2b2f33';
+        this.ctx.font = 'bold 16px Arial';
+        this.ctx.textAlign = 'left';
+        this.ctx.fillText(`Score: ${scoreValue}`, x + 14, y + 26);
+
+        this.ctx.font = '14px Arial';
+        this.ctx.fillText(`Best: ${this.highScore}`, x + 14, y + 48);
+        this.ctx.fillText(`Time: ${this.formatTime(timeValue)}`, x + 110, y + 48);
+        this.ctx.restore();
+    }
+
+    drawScorePopups() {
+        this.scorePopups = this.scorePopups.filter(popup => popup.life > 0);
+        this.scorePopups.forEach(popup => {
+            popup.y -= 0.6;
+            popup.life -= 1;
+            popup.alpha = Math.max(0, popup.alpha - 0.02);
+
+            this.ctx.save();
+            this.ctx.globalAlpha = popup.alpha;
+            this.ctx.fillStyle = popup.color;
+            this.ctx.font = 'bold 16px Arial';
+            this.ctx.textAlign = 'center';
+            this.ctx.fillText(popup.text, popup.x, popup.y);
+            this.ctx.restore();
+        });
+    }
+
+    formatTime(seconds) {
+        const mins = Math.floor(seconds / 60);
+        const secs = Math.floor(seconds % 60);
+        return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+    }
+
     draw() {
         // 绘制渐变背景
         const gradient = this.ctx.createLinearGradient(0, 0, 0, this.canvas.height);
@@ -661,10 +851,28 @@ class PlatformerGame {
         this.ctx.fillStyle = gradient;
         this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 
+        // 环境粒子
+        this.updateAmbientParticles();
+        this.drawAmbientParticles();
+
         // 绘制装饰性的云朵
         this.drawCloud(100, 100, 80);
         this.drawCloud(400, 200, 100);
         this.drawCloud(700, 150, 90);
+
+        // 轻微暗角提升层次感
+        const vignette = this.ctx.createRadialGradient(
+            this.canvas.width / 2,
+            this.canvas.height / 2,
+            this.canvas.height / 3,
+            this.canvas.width / 2,
+            this.canvas.height / 2,
+            this.canvas.height
+        );
+        vignette.addColorStop(0, 'rgba(0, 0, 0, 0)');
+        vignette.addColorStop(1, 'rgba(0, 0, 0, 0.12)');
+        this.ctx.fillStyle = vignette;
+        this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 
         // 绘制平台
         this.platforms.forEach(platform => {
@@ -772,6 +980,10 @@ class PlatformerGame {
         // 绘制血条
         this.drawHealthBar();
 
+        // 绘制分数HUD与得分浮动
+        this.drawScoreHUD();
+        this.drawScorePopups();
+
         // 如果游戏胜利，显示胜利消息
         if (this.gameWon) {
             this.showEndMessage('Mouse Escaped Successfully!');
@@ -873,13 +1085,21 @@ class PlatformerGame {
         this.ctx.textBaseline = 'middle';
         
         // Display only English message
-        this.ctx.fillText(message, this.canvas.width / 2, this.canvas.height / 2);
+        this.ctx.fillText(message, this.canvas.width / 2, this.canvas.height / 2 - 30);
+
+        // 显示分数信息
+        this.ctx.font = 'bold 22px Arial';
+        this.ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+        this.ctx.fillText(`Score: ${Math.floor(this.score)}`, this.canvas.width / 2, this.canvas.height / 2 + 10);
+        this.ctx.font = '18px Arial';
+        this.ctx.fillStyle = 'rgba(255, 255, 255, 0.75)';
+        this.ctx.fillText(`Best: ${this.highScore}`, this.canvas.width / 2, this.canvas.height / 2 + 38);
 
         // 绘制重玩按钮
         const buttonWidth = 200;
         const buttonHeight = 50;
         const buttonX = this.canvas.width / 2 - buttonWidth / 2;
-        const buttonY = this.canvas.height / 2 + 50;
+        const buttonY = this.canvas.height / 2 + 70;
 
         // 绘制按钮背景
         this.ctx.fillStyle = '#4CAF50';
@@ -931,12 +1151,27 @@ class PlatformerGame {
         setInterval(() => {
             // 随机选择一个未激活的Ori
             const inactiveOris = this.oris.filter(ori => !ori.active);
-            if (inactiveOris.length > 0 && Math.random() < 0.15) {  // 降低到15%的概率（原来是30%）
+            const spawnChance = this.difficulty?.oriSpawnChance ?? 0.15;
+            if (inactiveOris.length > 0 && Math.random() < spawnChance) {  // 动态概率
                 const ori = inactiveOris[Math.floor(Math.random() * inactiveOris.length)];
                 ori.active = true;
                 ori.x = -100;  // 从屏幕左侧开始
             }
         }, 1000);  // 增加到1000ms检查一次（原来是500ms）
+    }
+
+    updateDifficulty() {
+        if (!this.startTime || this.gameWon || this.gameOver) return;
+        const elapsedSeconds = (Date.now() - this.startTime) / 1000;
+        const level = Math.min(6, 1 + Math.floor(elapsedSeconds / 12));
+        const scaling = 1 + Math.min(elapsedSeconds / 40, 1.2);
+
+        this.difficulty.level = level;
+        this.difficulty.obstacleSpawnChance = Math.min(0.75, 0.4 + level * 0.05);
+        this.difficulty.obstacleSpeedBoost = Math.min(3, level * 0.4);
+        this.difficulty.platformSpeedMultiplier = Math.min(1.6, scaling);
+        this.difficulty.oriSpawnChance = Math.min(0.4, 0.15 + level * 0.03);
+        this.difficulty.oriSpeedMultiplier = Math.min(1.8, 1 + level * 0.12);
     }
 
     // 添加辅助方法来调整颜色亮度
