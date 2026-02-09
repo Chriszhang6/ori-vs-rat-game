@@ -2,88 +2,184 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>Ori vs Mouse</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Rat Jump - Doodle Jump Style</title>
     <link rel="icon" type="image/x-icon" href="./images/rat.jpeg">
     <style>
+        * {
+            touch-action: none;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+
         body {
             display: flex;
             flex-direction: column;
             align-items: center;
             min-height: 100vh;
             margin: 0;
-            padding: 32px 16px 48px;
+            padding: 16px 8px 24px;
             background: radial-gradient(circle at top, #f7fbff 0%, #eef3f8 45%, #e6ecf5 100%);
             font-family: "Avenir Next", "Helvetica Neue", Arial, sans-serif;
             color: #2b2f33;
         }
+
         h1 {
             color: #2d2b3a;
-            margin: 8px 0 18px;
-            font-size: 46px;
+            margin: 4px 0 12px;
+            font-size: 32px;
             letter-spacing: 1px;
+            text-align: center;
         }
+
         .game-container {
-            padding: 14px;
-            border-radius: 20px;
+            padding: 10px;
+            border-radius: 16px;
             background: rgba(255, 255, 255, 0.7);
             box-shadow: 0 18px 40px rgba(30, 53, 93, 0.12);
             backdrop-filter: blur(6px);
-            margin-bottom: 24px;
+            margin-bottom: 16px;
         }
+
         #gameCanvas {
             display: block;
             border: 1px solid rgba(45, 43, 58, 0.15);
-            border-radius: 16px;
+            border-radius: 12px;
             background: #eaf3ff;
+            touch-action: none;
         }
+
         .instructions {
             background-color: #fff;
-            padding: 20px 30px;
-            border-radius: 16px;
+            padding: 16px 20px;
+            border-radius: 12px;
             box-shadow: 0 10px 24px rgba(30, 53, 93, 0.12);
-            max-width: 640px;
+            max-width: 500px;
             text-align: left;
-            line-height: 1.8;
-            font-size: 16px;
+            line-height: 1.6;
+            font-size: 14px;
             color: #3d4350;
         }
+
         .instructions h2 {
             color: #FF69B4;
             text-align: center;
-            margin-bottom: 15px;
-            font-size: 24px;
+            margin-bottom: 12px;
+            font-size: 20px;
         }
+
         .key-icon {
             display: inline-block;
             background-color: #f8f9fa;
             border: 1px solid #ddd;
             border-radius: 4px;
-            padding: 2px 8px;
-            margin: 0 4px;
+            padding: 2px 6px;
+            margin: 0 3px;
             font-family: monospace;
             font-weight: bold;
             color: #666;
+            font-size: 12px;
         }
+
         .controls {
-            margin-bottom: 15px;
-            padding-bottom: 15px;
+            margin-bottom: 12px;
+            padding-bottom: 12px;
             border-bottom: 1px solid #eee;
         }
-        .warning {
-            color: #e91e63;
-            font-weight: 500;
-            margin-top: 10px;
-        }
+
         .control-item {
-            margin: 8px 0;
+            margin: 6px 0;
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 8px;
+        }
+
+        /* Mobile responsive */
+        @media (max-width: 768px) {
+            body {
+                padding: 8px 4px 16px;
+            }
+
+            h1 {
+                font-size: 24px;
+                margin: 2px 0 8px;
+            }
+
+            .game-container {
+                padding: 6px;
+                margin-bottom: 12px;
+                width: 100%;
+                max-width: 450px;
+            }
+
+            #gameCanvas {
+                width: 100%;
+                height: auto;
+                aspect-ratio: 9/16;
+            }
+
+            .instructions {
+                padding: 12px 16px;
+                font-size: 13px;
+                max-width: 100%;
+            }
+
+            .instructions h2 {
+                font-size: 18px;
+            }
+
+            .control-item {
+                font-size: 13px;
+            }
+        }
+
+        /* Portrait mode enforcement message */
+        @media (orientation: landscape) and (max-height: 600px) {
+            .rotate-message {
+                display: flex;
+            }
+        }
+
+        .rotate-message {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            z-index: 9999;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .rotate-message svg {
+            width: 64px;
+            height: 64px;
+            margin-bottom: 16px;
+            animation: rotate 2s ease-in-out infinite;
+        }
+
+        @keyframes rotate {
+            0%, 100% { transform: rotate(0deg); }
+            50% { transform: rotate(-90deg); }
         }
     </style>
 </head>
 <body>
-    <h1>Ori vs Mouse</h1>
+    <div class="rotate-message">
+        <svg viewBox="0 0 24 24" fill="currentColor">
+            <path d="M16.48 2.52c3.27 1.55 5.61 4.72 5.97 8.48h1.5C23.44 4.84 18.29 0 12 0l-1 2-1-2c-6.29 0-11.44 4.84-11.95 11h1.5c.36-3.76 2.7-6.93 5.97-8.48h7.96zM4 12c0 4.42 3.58 8 8 8s8-3.58 8-8h-2c0 3.31-2.69 6-6 6s-6-2.69-6-6H4z"/>
+        </svg>
+        <p>Please rotate your device to portrait mode</p>
+    </div>
+
+    <h1>Rat Jump</h1>
     <div class="game-container">
         <canvas id="gameCanvas"></canvas>
     </div>
@@ -91,19 +187,19 @@
         <h2>How to Play</h2>
         <div class="controls">
             <div class="control-item">
-                <span class="key-icon">→</span> Move right
+                <span class="key-icon">→</span> or <span class="key-icon">←</span> Move left/right
             </div>
             <div class="control-item">
-                <span class="key-icon">←</span> Move left
+                Auto-jump on platforms - Doodle Jump style!
             </div>
             <div class="control-item">
-                <span class="key-icon">SPACE</span> Jump one level
+                📱 On mobile: Tap left/right side of screen
             </div>
         </div>
-        <div class="warning">
-            ⚠️ Warning: Poison reduces 10% HP, Dog Ori will knock back the mouse to previous level
-        </div>
+        <p style="margin: 0; color: #666;">
+            Reach as high as you can! Avoid falling off the bottom of the screen.
+        </p>
     </div>
-    <script src="game.js?v=2"></script>
+    <script src="game.js?v=3"></script>
 </body>
 </html> 

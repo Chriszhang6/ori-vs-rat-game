@@ -1,12 +1,108 @@
+// Doodle Jump 平台生成器
+class PlatformGenerator {
+    constructor(canvasWidth, canvasHeight) {
+        this.canvasWidth = canvasWidth;
+        this.canvasHeight = canvasHeight;
+        this.platformSpacing = 100;  // 平台之间的垂直距离
+        this.minPlatformWidth = 70;
+        this.maxPlatformWidth = 140;
+        this.colors = ['#FFB6C1', '#98FB98', '#87CEFA', '#DDA0DD', '#F0E68C', '#FFA07A'];
+        this.highestPlatformY = 0;
+    }
+
+    generateInitialPlatforms() {
+        const platforms = [];
+        // 在底部创建起始平台
+        const startPlatform = {
+            x: this.canvasWidth / 2 - 60,
+            y: this.canvasHeight - 150,
+            width: 150,
+            height: 18,
+            velocityX: 0,
+            color: '#98FB98',
+            borderRadius: 10,
+            type: 'normal',
+            isStart: true
+        };
+        platforms.push(startPlatform);
+
+        // 向上生成约12个平台
+        for (let i = 1; i < 12; i++) {
+            platforms.push(this.createPlatform(
+                this.canvasHeight - 150 - (i * this.platformSpacing)
+            ));
+        }
+        this.highestPlatformY = platforms[platforms.length - 1].y;
+        return platforms;
+    }
+
+    createPlatform(y) {
+        const type = this.getRandomType();
+        const width = this.minPlatformWidth + Math.random() * (this.maxPlatformWidth - this.minPlatformWidth);
+        const hasVelocityX = type === 'moving';
+
+        return {
+            x: Math.random() * (this.canvasWidth - width),
+            y: y,
+            width: width,
+            height: 18,
+            velocityX: hasVelocityX ? (Math.random() - 0.5) * 3 : 0,
+            color: this.colors[Math.floor(Math.random() * this.colors.length)],
+            borderRadius: 10,
+            type: type,
+            opacity: type === 'disappearing' ? 1.0 : null,
+            disappearing: false
+        };
+    }
+
+    getRandomType() {
+        const rand = Math.random();
+        if (rand < 0.08) return 'moving';       // 8% 移动平台
+        if (rand < 0.12) return 'disappearing'; // 4% 消失平台
+        return 'normal';                         // 88% 普通平台
+    }
+
+    shouldGeneratePlatform(highestPlatformY, cameraY) {
+        // 当最高平台距离相机顶部小于200px时生成新平台
+        return highestPlatformY > cameraY - 300;
+    }
+
+    generateNextPlatform() {
+        // 添加一些随机性到间距
+        this.highestPlatformY -= (this.platformSpacing + Math.random() * 30 - 15);
+        return this.createPlatform(this.highestPlatformY);
+    }
+}
+
 class PlatformerGame {
     constructor() {
         console.log('Platformer Game initializing...');
         this.canvas = document.getElementById('gameCanvas');
         this.ctx = this.canvas.getContext('2d');
         
-        // 设置画布大小为更小的尺寸
-        this.canvas.width = 800;  // 从1000减小到800
-        this.canvas.height = 600;  // 从800减小到600
+        // Doodle Jump 风格：竖屏画布
+        this.canvas.width = 450;
+        this.canvas.height = 800;
+
+        // 相机系统 - 只向上移动
+        this.camera = {
+            y: 0,
+            targetY: 0,
+            smoothness: 0.08
+        };
+
+        // 天空背景配置 - 根据高度变化
+        this.skyThemes = [
+            { height: 0, name: '黎明', gradient: ['#FFE4B5', '#FFDAB9', '#FFA07A'] },
+            { height: 300, name: '清晨', gradient: ['#87CEEB', '#B0E0E6', '#E0F7FA'] },
+            { height: 600, name: '白天', gradient: ['#87CEEB', '#ADD8E6', '#E0F7FA'] },
+            { height: 1200, name: '黄昏', gradient: ['#FF7E5F', '#FEB47B', '#FFD700'] },
+            { height: 1800, name: '日落', gradient: ['#FF6B6B', '#FF8E53', '#FCA5A5'] },
+            { height: 2400, name: '傍晚', gradient: ['#4A00E0', '#8E2DE2', '#2C1B4E'] },
+            { height: 3000, name: '夜晚', gradient: ['#0f0c29', '#302b63', '#24243e'] },
+            { height: 4000, name: '星空', gradient: ['#000000', '#0f0c29', '#1a1a2e'] }
+        ];
+        this.currentSkyGradient = null;
 
         // 计分与视觉状态
         this.score = 0;
@@ -18,6 +114,7 @@ class PlatformerGame {
         this.maxLevelReached = 0;
         this.scorePopups = [];
         this.scoreFinalized = false;
+        this.lastSkyTheme = null;  // 记录上次的天空主题
         this.ambientParticles = this.createAmbientParticles(36);
         this.difficulty = {
             level: 1,
@@ -26,13 +123,11 @@ class PlatformerGame {
             platformSpeedMultiplier: 1,
             oriSpawnChance: 0.15,
             oriSpeedMultiplier: 1
-        };
-        this.exitHoldDuration = 900;
-        this.exitHoldStart = null;
-        
+ };
+        // Doodle Jump：无尽模式，无出口
+
         // 游戏状态
         this.gameStarted = false;  // 添加游戏开始状态
-        this.gameWon = false;
         this.gameOver = false;
         this.obstacleInterval = null;
         this.imagesLoaded = false;  // 添加图片加载状态
@@ -311,21 +406,11 @@ class PlatformerGame {
         this.maxLevelReached = 0;
         this.scorePopups = [];
         this.scoreFinalized = false;
-        this.exitHoldStart = null;
         this.difficulty.level = 1;
-        
-        this.platforms = this.generatePlatforms();
 
-        // 修正出口位置计算
-        const topPlatformY = this.platforms[6].y;  // 获取最顶层平台的Y坐标
-        this.exit = {
-            x: this.canvas.width - 58,  // 进一步内收，避免贴边
-            y: topPlatformY - 54,  // 让门与平台保持更自然的比例
-            width: 48,
-            height: 48,
-            image: new Image()
-        };
-        this.exit.image.src = './images/door.png';
+        // Doodle Jump：使用无尽平台生成器
+        this.platformGenerator = new PlatformGenerator(this.canvas.width, this.canvas.height);
+        this.platforms = this.platformGenerator.generateInitialPlatforms();
 
         // 初始化障碍物 - 调整大小
         this.obstacles = {
@@ -337,45 +422,45 @@ class PlatformerGame {
         };
         this.obstacles.poison.image.src = './images/rat poison.png';
 
-        // 初始化Ori数组 - 调整大小
+        // Doodle Jump：暂时禁用Ori敌人（无尽模式）
+        this.oris = [];
+        /* 保留原代码供参考
         this.oris = this.platforms.slice(3, 6).map((platform, index) => ({
             x: -80,
             y: platform.y - 60,
-            width: 60,  // 从80改为60
-            height: 60,  // 从80改为60
-            speed: 6,   // 从8改为6，使移动更适合新的画布大小
+            width: 60,
+            height: 60,
+            speed: 6,
             active: false,
             platform: index + 3,
             image: new Image()
         }));
-        
+
         // 加载Ori图片
         this.oris.forEach(ori => {
             ori.image.src = './images/ori.jpeg';
         });
+        */
 
-        // 初始化老鼠 - 调整大小
+        // 初始化老鼠 - Doodle Jump 风格
         this.rat = {
-            x: 0,
-            y: this.canvas.height - 60,
-            width: 60,  // 从80改为60
-            height: 60,  // 从80改为60
-            speed: 5,   // 从7改为5
-            jumpStrength: 20,  // 从23改为20
+            x: this.canvas.width / 2 - 25,  // 从中间开始
+            y: this.canvas.height - 150 - 50,  // 在第一个平台上方
+            width: 50,
+            height: 50,
+            speed: 6,
+            bounceStrength: -17,  // Doodle Jump 风格自动弹跳
             velocityY: 0,
-            onGround: true,
+            onGround: true,  // 初始在平台上
             health: 100,
             image: new Image()
         };
         this.rat.image.src = './images/rat.jpeg';
         
-        // 添加按键状态跟踪
+        // 添加按键状态跟踪（Doodle Jump 只需要左右移动）
         this.keys = {
-            ArrowUp: false,
-            ArrowDown: false,
             ArrowRight: false,
-            ArrowLeft: false,
-            Space: false
+            ArrowLeft: false
         };
 
         // 设置键盘控制
@@ -383,57 +468,36 @@ class PlatformerGame {
         
         // 生成初始障碍物
         this.generateObstacles();
-        
+
         // 开始游戏循环
         this.startGameLoop();
 
-        // 开始Ori的随机出现
-        this.startOriMovement();
+        // Doodle Jump：暂时禁用Ori敌人
+        // this.startOriMovement();
     }
 
-    generatePlatforms() {
-        const platforms = [];
-        const platformHeight = 20;  // 减小平台高度
-        const platformSpacing = 80;  // 减小平台间距
-        const shortPlatformWidth = 120;  // 减小平台宽度
-        
-        // 定义可爱的柔和颜色数组
-        const platformColors = [
-            '#FFB6C1',  // 浅粉红
-            '#98FB98',  // 浅绿色
-            '#87CEFA',  // 浅蓝色
-            '#DDA0DD',  // 梅红色
-            '#F0E68C',  // 浅黄色
-            '#FFB6C1'   // 浅粉红
-        ];
-
-        // 生成6个短平台
-        for (let i = 0; i < 6; i++) {
-            platforms.push({
-                x: Math.random() * (this.canvas.width - shortPlatformWidth),
-                y: this.canvas.height - (i + 1) * platformSpacing,
-                width: shortPlatformWidth,
-                height: platformHeight,
-                velocityX: (Math.random() - 0.5) * 3 * 2.5,
-                color: platformColors[i],
-                borderRadius: 12
-            });
+    // Doodle Jump：动态管理平台（添加和移除）
+    managePlatforms() {
+        // 生成新平台
+        if (this.platformGenerator.shouldGeneratePlatform(
+            this.platformGenerator.highestPlatformY,
+            this.camera.y
+        )) {
+            this.platforms.push(this.platformGenerator.generateNextPlatform());
         }
 
-        // 添加最后的长平台（第7级）- 特殊设计
-        const finalPlatform = {
-            x: 0,
-            y: this.canvas.height - 7 * platformSpacing,
-            width: this.canvas.width,
-            height: platformHeight * 1.5,  // 稍微加高
-            velocityX: 0,
-            color: '#FF69B4',  // 明亮的粉色
-            borderRadius: 15,  // 更大的圆角
-            isSpecial: true    // 标记为特殊平台
-        };
-        platforms.push(finalPlatform);
-
-        return platforms;
+        // 移除相机下方的平台以优化性能
+        const removeThreshold = this.camera.y + this.canvas.height + 100;
+        this.platforms = this.platforms.filter(platform => {
+            // 检查是否是消失平台
+            if (platform.type === 'disappearing' && platform.disappearing) {
+                platform.opacity -= 0.03;
+                if (platform.opacity <= 0) {
+                    return false;
+                }
+            }
+            return platform.y < removeThreshold;
+        });
     }
 
     generateObstacles() {
@@ -456,19 +520,10 @@ class PlatformerGame {
     }
 
     setupControls() {
-        // 阻止空格键的默认滚动行为
-        window.addEventListener('keydown', (e) => {
-            if (e.code === 'Space') {
-                e.preventDefault();  // 阻止默认滚动
-            }
-        });
-
+        // Doodle Jump 只需要左右控制
         this.keydownHandler = (e) => {
             if (this.keys.hasOwnProperty(e.key)) {
                 this.keys[e.key] = true;
-            }
-            if (e.key === ' ') {  // 处理空格字符
-                this.keys.Space = true;
             }
         };
 
@@ -476,13 +531,58 @@ class PlatformerGame {
             if (this.keys.hasOwnProperty(e.key)) {
                 this.keys[e.key] = false;
             }
-            if (e.key === ' ') {  // 处理空格字符
-                this.keys.Space = false;
-            }
         };
 
         document.addEventListener('keydown', this.keydownHandler);
         document.addEventListener('keyup', this.keyupHandler);
+
+        // Doodle Jump：移动端触摸控制
+        this.setupTouchControls();
+    }
+
+    setupTouchControls() {
+        // 触摸开始
+        this.canvas.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            const touch = e.touches[0];
+            const rect = this.canvas.getBoundingClientRect();
+            const tapX = touch.clientX - rect.left;
+
+            // 左侧向左，右侧向右
+            if (tapX < this.canvas.width / 2) {
+                this.keys.ArrowLeft = true;
+                this.keys.ArrowRight = false;
+            } else {
+                this.keys.ArrowRight = true;
+                this.keys.ArrowLeft = false;
+            }
+        }, { passive: false });
+
+        // 触摸移动
+        this.canvas.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            const touch = e.touches[0];
+            const rect = this.canvas.getBoundingClientRect();
+            const currentX = touch.clientX - rect.left;
+
+            // 根据手指位置更新方向
+            this.keys.ArrowLeft = currentX < this.canvas.width / 2;
+            this.keys.ArrowRight = currentX >= this.canvas.width / 2;
+        }, { passive: false });
+
+        // 触摸结束
+        this.canvas.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            this.keys.ArrowLeft = false;
+            this.keys.ArrowRight = false;
+        }, { passive: false });
+
+        // 触摸取消
+        this.canvas.addEventListener('touchcancel', (e) => {
+            e.preventDefault();
+            this.keys.ArrowLeft = false;
+            this.keys.ArrowRight = false;
+        }, { passive: false });
     }
 
     startGameLoop() {
@@ -494,19 +594,90 @@ class PlatformerGame {
         }
     }
 
+    // Doodle Jump 相机系统：只向上移动
+    updateCamera() {
+        const playerScreenY = this.rat.y - this.camera.y;
+        const triggerHeight = this.canvas.height * 0.45;  // 玩家到达屏幕上方45%时相机移动
+
+        if (playerScreenY < triggerHeight) {
+            this.camera.targetY = this.rat.y - triggerHeight;
+        }
+
+        // 相机只向上移动（y值变小），不向下
+        if (this.camera.targetY < this.camera.y) {
+            this.camera.y += (this.camera.targetY - this.camera.y) * this.camera.smoothness;
+        }
+    }
+
+    // 根据高度获取当前天空渐变
+    getCurrentSkyGradient() {
+        const currentHeight = this.maxLevelReached * 100;  // 转换为像素
+
+        // 找到当前高度对应的天空主题
+        for (let i = this.skyThemes.length - 1; i >= 0; i--) {
+            if (currentHeight >= this.skyThemes[i].height) {
+                return this.skyThemes[i];
+            }
+        }
+        return this.skyThemes[0];  // 默认返回第一个主题
+    }
+
+    // 混合两个颜色
+    lerpColor(color1, color2, t) {
+        const c1 = this.hexToRgb(color1);
+        const c2 = this.hexToRgb(color2);
+
+        const r = Math.round(c1.r + (c2.r - c1.r) * t);
+        const g = Math.round(c1.g + (c2.g - c1.g) * t);
+        const b = Math.round(c1.b + (c2.b - c1.b) * t);
+
+        return `rgb(${r}, ${g}, ${b})`;
+    }
+
+    hexToRgb(hex) {
+        const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+        return result ? {
+            r: parseInt(result[1], 16),
+            g: parseInt(result[2], 16),
+            b: parseInt(result[3], 16)
+        } : { r: 0, g: 0, b: 0 };
+    }
+
     updateMovement() {
+        // Doodle Jump：首先更新相机
+        this.updateCamera();
+
+        // 管理平台（动态生成和移除）
+        this.managePlatforms();
+
         // 移除麻痹状态检查，直接进行移动更新
         let onPlatform = false;
 
-        // 计分：存活时间
+        // Doodle Jump 计分：基于高度
+        const currentHeight = Math.floor(Math.abs(this.camera.y) / 100);
+        if (currentHeight > this.maxLevelReached) {
+            const heightBonus = (currentHeight - this.maxLevelReached) * 100;
+            this.addScore(heightBonus, this.rat.x + this.rat.width / 2, this.rat.y);
+            this.maxLevelReached = currentHeight;
+
+            // 检查是否切换到新的天空主题
+            const currentSkyTheme = this.getCurrentSkyGradient();
+            if (this.lastSkyTheme !== currentSkyTheme.name) {
+                this.lastSkyTheme = currentSkyTheme.name;
+                // 显示天空主题变化通知
+                this.showSkyThemeNotification(currentSkyTheme);
+            }
+        }
+
+        // 保持分数增长基于时间
         const now = performance.now();
         if (this.lastScoreTimestamp === null) {
             this.lastScoreTimestamp = now;
         }
         const deltaSeconds = (now - this.lastScoreTimestamp) / 1000;
         this.lastScoreTimestamp = now;
-        if (!this.gameOver && !this.gameWon) {
-            this.score += deltaSeconds * this.scorePerSecond;
+        if (!this.gameOver) {
+            this.score += deltaSeconds * 5;  // 降低时间分数，主要靠高度得分
         }
         
         // 更新水平移动
@@ -517,20 +688,8 @@ class PlatformerGame {
             this.rat.x -= this.rat.speed;
         }
 
-        // 更新垂直移动和跳跃
-        if (this.keys.Space && this.rat.onGround) {
-            // 只有在真正起跳时才播放音效
-            if (this.rat.velocityY >= 0) {  // 确保不是在空中按空格
-                this.playJumpSound();  // 使用新的播放方法
-                console.log('Space key detected, jumping!');
-            }
-            this.rat.velocityY = -this.rat.jumpStrength;
-            this.rat.onGround = false;
-            this.rat.y -= 1;
-        }
-
-        // 应用重力
-        this.rat.velocityY += 0.7;
+        // Doodle Jump：应用重力
+        this.rat.velocityY += 0.6;  // 稍微降低重力，让跳跃更轻盈
         this.rat.y += this.rat.velocityY;
 
         // 更新障碍物位置
@@ -580,27 +739,26 @@ class PlatformerGame {
         // 重置onGround状态
         this.rat.onGround = false;
 
-        // 检查平台碰撞
+        // 检查平台碰撞 - Doodle Jump 自动弹跳
         this.platforms.forEach((platform, index) => {
             if (this.checkCollision(this.rat, platform)) {
-                // 只有当老鼠从上方落下时才能站在平台上
+                // 只有当老鼠从上方落下时才能弹跳
                 const ratBottom = this.rat.y + this.rat.height;
                 const ratPrevBottom = ratBottom - this.rat.velocityY;
                 const platformTop = platform.y;
 
                 if (this.rat.velocityY >= 0 && ratPrevBottom <= platformTop + 10) {
-                    // 从上方落下，停在平台上
-                    this.rat.y = platform.y - this.rat.height;
-                    this.rat.velocityY = 0;
-                    this.rat.onGround = true;
-
-                    // 到达新高度奖励
-                    if (index > this.maxLevelReached) {
-                        this.maxLevelReached = index;
-                        this.addScore(60, this.rat.x + this.rat.width / 2, platform.y);
+                    // 处理消失平台
+                    if (platform.type === 'disappearing' && !platform.disappearing) {
+                        platform.disappearing = true;
                     }
-                    
-                    // 只在非麻痹状态下跟随平台移动
+
+                    // Doodle Jump：自动弹跳！
+                    this.rat.y = platform.y - this.rat.height;
+                    this.rat.velocityY = this.rat.bounceStrength;
+                    this.playJumpSound();
+
+                    // 只在非移动状态下跟随平台移动
                     if (!this.keys.ArrowRight && !this.keys.ArrowLeft) {
                         this.rat.x += platform.velocityX;
                     }
@@ -608,16 +766,7 @@ class PlatformerGame {
             }
         });
 
-        // 限制跳跃高度不超过一级台阶
-        const platformSpacing = 80; // 台阶之间的间距
-        const maxJumpHeight = platformSpacing + 20; // 允许稍微超过一点以确保能跳上去
-        
-        // 如果向上速度太大，限制它
-        if (this.rat.velocityY < -Math.sqrt(2 * maxJumpHeight)) {
-            this.rat.velocityY = -Math.sqrt(2 * maxJumpHeight);
-        }
-
-        // 更新Ori的位置
+        // 更新Ori的位置（暂时保留，稍后可能移除）
         this.oris.forEach(ori => {
             if (ori.active) {
                 const speedMultiplier = this.difficulty?.oriSpeedMultiplier ?? 1;
@@ -655,34 +804,25 @@ class PlatformerGame {
             }
         });
 
-        // 限制老鼠在画布内
-        if (this.rat.x < 0) this.rat.x = 0;
-        if (this.rat.x + this.rat.width > this.canvas.width) this.rat.x = this.canvas.width - this.rat.width;
-        if (this.rat.y + this.rat.height > this.canvas.height) {
-            this.rat.y = this.canvas.height - this.rat.height;
-            this.rat.velocityY = 0;
-            this.rat.onGround = true;
+        // Doodle Jump 边界处理
+        // 左右穿越：从左边出去会从右边出来
+        if (this.rat.x + this.rat.width < 0) {
+            this.rat.x = this.canvas.width;
+        } else if (this.rat.x > this.canvas.width) {
+            this.rat.x = -this.rat.width;
         }
 
-        // 检查是否到达出口（需要停留一小段时间）
-        if (this.checkCollision(this.rat, this.exit)) {
-            if (!this.exitHoldStart) {
-                this.exitHoldStart = Date.now();
-            }
-            if (Date.now() - this.exitHoldStart >= this.exitHoldDuration) {
-                this.playSound('win');
-                console.log('You win!');
-                this.gameWon = true;
-                // 清除所有游戏循环和障碍物生成
-                clearInterval(this.updateInterval);
-                clearInterval(this.obstacleInterval);
-                // 清除所有现有障碍物
-                this.obstacles.poison.list = [];
-                this.finalizeScore('win');
-            }
-        } else {
-            this.exitHoldStart = null;
+        // 掉落死亡：掉出屏幕底部（考虑相机偏移）
+        if (this.rat.y > this.camera.y + this.canvas.height + 50) {
+            console.log('Game Over - fell off screen!');
+            this.gameOver = true;
+            clearInterval(this.updateInterval);
+            clearInterval(this.obstacleInterval);
+            this.obstacles.poison.list = [];
+            this.finalizeScore('lose');
         }
+
+        // Doodle Jump：无胜利条件，无尽模式
     }
 
     checkCollision(obj1, obj2) {
@@ -776,14 +916,11 @@ class PlatformerGame {
         this.scoreFinalized = true;
         this.endTime = Date.now();
 
-        if (result === 'win') {
-            const elapsed = (Date.now() - this.startTime) / 1000;
-            const timeBonus = Math.max(0, Math.floor(900 - elapsed * 8));
-            const healthBonus = Math.floor(this.rat.health * 6);
-            const totalBonus = timeBonus + healthBonus;
-            if (totalBonus > 0) {
-                this.addScore(totalBonus, this.exit.x + this.exit.width / 2, this.exit.y);
-            }
+        // Doodle Jump：无尽模式只有失败，没有胜利
+        // 健康奖励（如果有剩余血量）
+        const healthBonus = Math.floor(this.rat.health * 2);
+        if (healthBonus > 0) {
+            this.addScore(healthBonus, this.rat.x + this.rat.width / 2, this.rat.y);
         }
 
         this.updateHighScore();
@@ -791,8 +928,8 @@ class PlatformerGame {
 
     drawScoreHUD() {
         const padding = 14;
-        const panelWidth = 200;
-        const panelHeight = 72;
+        const panelWidth = 180;
+        const panelHeight = 85;
         const x = padding;
         const y = padding;
 
@@ -806,8 +943,8 @@ class PlatformerGame {
         this.ctx.stroke();
 
         const scoreValue = Math.floor(this.score);
-        const endReference = this.endTime || Date.now();
-        const timeValue = this.startTime ? (endReference - this.startTime) / 1000 : 0;
+        const heightValue = this.maxLevelReached;
+        const skyTheme = this.getCurrentSkyGradient();
 
         this.ctx.fillStyle = '#2b2f33';
         this.ctx.font = 'bold 16px Arial';
@@ -816,24 +953,49 @@ class PlatformerGame {
 
         this.ctx.font = '14px Arial';
         this.ctx.fillText(`Best: ${this.highScore}`, x + 14, y + 48);
-        this.ctx.fillText(`Time: ${this.formatTime(timeValue)}`, x + 110, y + 48);
+        this.ctx.fillText(`Height: ${heightValue}m`, x + 100, y + 48);
+
+        // 显示当前时间/天空主题
+        this.ctx.fillStyle = skyTheme.gradient[2] === '#1a1a2e' ? '#888' : '#666';
+        this.ctx.font = 'bold 13px Arial';
+        this.ctx.fillText(`🌅 ${skyTheme.name}`, x + 14, y + 70);
         this.ctx.restore();
     }
 
     drawScorePopups() {
         this.scorePopups = this.scorePopups.filter(popup => popup.life > 0);
         this.scorePopups.forEach(popup => {
-            popup.y -= 0.6;
-            popup.life -= 1;
-            popup.alpha = Math.max(0, popup.alpha - 0.02);
+            if (popup.isNotification) {
+                // 通知样式：居中显示，更大字体
+                popup.life -= 1;
+                popup.alpha = Math.max(0, popup.alpha - 0.008);
 
-            this.ctx.save();
-            this.ctx.globalAlpha = popup.alpha;
-            this.ctx.fillStyle = popup.color;
-            this.ctx.font = 'bold 16px Arial';
-            this.ctx.textAlign = 'center';
-            this.ctx.fillText(popup.text, popup.x, popup.y);
-            this.ctx.restore();
+                this.ctx.save();
+                this.ctx.globalAlpha = popup.alpha;
+                this.ctx.fillStyle = popup.color;
+                this.ctx.font = `bold ${popup.size}px Arial`;
+                this.ctx.textAlign = 'center';
+                this.ctx.textBaseline = 'middle';
+                // 添加发光效果
+                this.ctx.shadowColor = popup.color;
+                this.ctx.shadowBlur = 15;
+                this.ctx.fillText(popup.text, popup.x, popup.y);
+                this.ctx.restore();
+            } else {
+                // 普通分数弹窗
+                popup.y -= 0.6;
+                popup.life -= 1;
+                popup.alpha = Math.max(0, popup.alpha - 0.02);
+
+                this.ctx.save();
+                this.ctx.globalAlpha = popup.alpha;
+                this.ctx.fillStyle = popup.color;
+                this.ctx.font = 'bold 16px Arial';
+                this.ctx.textAlign = 'center';
+                // 应用相机偏移
+                this.ctx.fillText(popup.text, popup.x, popup.y - this.camera.y);
+                this.ctx.restore();
+            }
         });
     }
 
@@ -844,10 +1006,12 @@ class PlatformerGame {
     }
 
     draw() {
-        // 绘制渐变背景
+        // Doodle Jump：绘制动态天空背景
+        const skyTheme = this.getCurrentSkyGradient();
         const gradient = this.ctx.createLinearGradient(0, 0, 0, this.canvas.height);
-        gradient.addColorStop(0, '#E0F7FA');  // 浅蓝色
-        gradient.addColorStop(1, '#B2EBF2');  // 更深的浅蓝色
+        gradient.addColorStop(0, skyTheme.gradient[0]);
+        gradient.addColorStop(0.5, skyTheme.gradient[1]);
+        gradient.addColorStop(1, skyTheme.gradient[2]);
         this.ctx.fillStyle = gradient;
         this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 
@@ -855,10 +1019,16 @@ class PlatformerGame {
         this.updateAmbientParticles();
         this.drawAmbientParticles();
 
-        // 绘制装饰性的云朵
-        this.drawCloud(100, 100, 80);
-        this.drawCloud(400, 200, 100);
-        this.drawCloud(700, 150, 90);
+        // Doodle Jump：根据时间阶段绘制装饰
+        if (skyTheme.name === '星空') {
+            // 星空模式：绘制星星
+            this.drawStars();
+        } else {
+            // 其他模式：绘制云朵
+            this.drawCloud(100, 100, 80);
+            this.drawCloud(400, 200, 100);
+            this.drawCloud(700, 150, 90);
+        }
 
         // 轻微暗角提升层次感
         const vignette = this.ctx.createRadialGradient(
@@ -874,29 +1044,37 @@ class PlatformerGame {
         this.ctx.fillStyle = vignette;
         this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 
-        // 绘制平台
+        // 绘制平台（应用相机偏移）
         this.platforms.forEach(platform => {
-            // 添加平台阴影
-            this.ctx.shadowColor = 'rgba(0, 0, 0, 0.3)';
-            this.ctx.shadowBlur = 8;
-            this.ctx.shadowOffsetY = 4;
+            const screenY = platform.y - this.camera.y;
+            // 只绘制屏幕内的平台
+            if (screenY > -50 && screenY < this.canvas.height + 50) {
+                // Doodle Jump：应用透明度（用于消失平台）
+                if (platform.opacity !== null) {
+                    this.ctx.globalAlpha = platform.opacity;
+                }
+
+                // 添加平台阴影
+                this.ctx.shadowColor = 'rgba(0, 0, 0, 0.3)';
+                this.ctx.shadowBlur = 8;
+                this.ctx.shadowOffsetY = 4;
             
             // 绘制圆角矩形平台
             this.ctx.beginPath();
             this.ctx.roundRect(
-                platform.x, 
-                platform.y, 
-                platform.width, 
-                platform.height, 
+                platform.x,
+                screenY,
+                platform.width,
+                platform.height,
                 platform.borderRadius
             );
-            
+
             // 创建渐变填充
             const gradient = this.ctx.createLinearGradient(
-                platform.x, 
-                platform.y, 
-                platform.x, 
-                platform.y + platform.height
+                platform.x,
+                screenY,
+                platform.x,
+                screenY + platform.height
             );
 
             if (platform.isSpecial) {
@@ -904,74 +1082,87 @@ class PlatformerGame {
                 gradient.addColorStop(0, '#FF69B4');  // 明亮的粉色
                 gradient.addColorStop(0.5, '#FFB6C1'); // 浅粉色
                 gradient.addColorStop(1, '#FF69B4');  // 明亮的粉色
-                
+
                 // 添加星星装饰
                 for (let i = 0; i < 10; i++) {
                     const starX = platform.x + (platform.width / 10) * i + 20;
-                    const starY = platform.y + platform.height / 2;
+                    const starY = screenY + platform.height / 2;
                     this.drawStar(starX, starY, 8, '#FFD700');
                 }
+            } else if (platform.type === 'disappearing') {
+                // Doodle Jump：消失平台样式
+                gradient.addColorStop(0, '#FFA07A');  // 浅橙色
+                gradient.addColorStop(1, '#CD5C5C');  // IndianRed
+            } else if (platform.type === 'moving') {
+                // Doodle Jump：移动平台样式
+                gradient.addColorStop(0, '#DDA0DD');  // 梅红色
+                gradient.addColorStop(1, '#BA55D3');  // MediumOrchid
             } else {
                 gradient.addColorStop(0, platform.color);
                 gradient.addColorStop(1, this.adjustColor(platform.color, -20));
             }
-            
+
             this.ctx.fillStyle = gradient;
             this.ctx.fill();
-            
+
             // 添加高光效果
             this.ctx.beginPath();
             this.ctx.roundRect(
-                platform.x + 2, 
-                platform.y + 2, 
-                platform.width - 4, 
-                platform.height / 3, 
+                platform.x + 2,
+                screenY + 2,
+                platform.width - 4,
+                platform.height / 3,
                 platform.borderRadius
             );
             this.ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
             this.ctx.fill();
 
-            // 重置阴影
+            // 重置阴影和透明度
             this.ctx.shadowColor = 'transparent';
             this.ctx.shadowBlur = 0;
             this.ctx.shadowOffsetY = 0;
+            this.ctx.globalAlpha = 1;
+            }
         });
 
-        // 绘制障碍物（圆形）
+        // 绘制障碍物（圆形）- 应用相机偏移
         Object.keys(this.obstacles).forEach(type => {
             this.obstacles[type].list.forEach(obstacle => {
-                this.drawCircularImage(
-                    this.obstacles[type].image,
-                    obstacle.x,
-                    obstacle.y,
-                    obstacle.width
-                );
+                const screenY = obstacle.y - this.camera.y;
+                if (screenY > -50 && screenY < this.canvas.height + 50) {
+                    this.drawCircularImage(
+                        this.obstacles[type].image,
+                        obstacle.x,
+                        screenY,
+                        obstacle.width
+                    );
+                }
             });
         });
 
-        // 绘制出口（圆形）
-        this.drawCircularImage(
-            this.exit.image,
-            this.exit.x,
-            this.exit.y,
-            this.exit.width
-        );
+        // Doodle Jump：暂不绘制出口（无尽模式）
+        // this.drawCircularImage(
+        //     this.exit.image,
+        //     this.exit.x,
+        //     this.exit.y - this.camera.y,
+        //     this.exit.width
+        // );
 
-        // 绘制老鼠（圆形）
+        // 绘制老鼠（圆形）- 应用相机偏移
         this.drawCircularImage(
             this.rat.image,
             this.rat.x,
-            this.rat.y,
+            this.rat.y - this.camera.y,
             this.rat.width
         );
 
-        // 绘制Ori
+        // 绘制Ori - 应用相机偏移
         this.oris.forEach(ori => {
             if (ori.active) {
                 this.drawCircularImage(
                     ori.image,
                     ori.x,
-                    ori.y,
+                    ori.y - this.camera.y,
                     ori.width
                 );
             }
@@ -980,28 +1171,26 @@ class PlatformerGame {
         // 绘制血条
         this.drawHealthBar();
 
+        // Doodle Jump：绘制触摸控制指示器
+        this.drawTouchControls();
+
         // 绘制分数HUD与得分浮动
         this.drawScoreHUD();
         this.drawScorePopups();
 
-        // 如果游戏胜利，显示胜利消息
-        if (this.gameWon) {
-            this.showEndMessage('Mouse Escaped Successfully!');
-        }
-
-        // 如果游戏失败，显示失败消息
+        // Doodle Jump：无尽模式只有游戏结束
         if (this.gameOver) {
             this.showEndMessage('Game Over!');
         }
     }
 
     drawHealthBar() {
-        const barWidth = 100;
-        const barHeight = 10;
+        const barWidth = 80;
+        const barHeight = 8;
         const padding = 5;
-        
+
         const x = this.rat.x + (this.rat.width - barWidth) / 2;
-        const y = this.rat.y - barHeight - padding;
+        const y = this.rat.y - this.camera.y - barHeight - padding;
 
         // 绘制圆角血条背景
         this.ctx.beginPath();
@@ -1072,28 +1261,77 @@ class PlatformerGame {
         this.ctx.restore();
     }
 
+    // Doodle Jump：绘制触摸控制指示器
+    drawTouchControls() {
+        // 只在触摸设备上显示
+        if (!('ontouchstart' in window)) return;
+
+        const alpha = 0.25;
+        const radius = 45;
+        const bottomOffset = 70;
+
+        // 左侧控制指示器
+        if (this.keys.ArrowLeft) {
+            this.ctx.save();
+            this.ctx.fillStyle = `rgba(255, 105, 180, ${alpha})`;
+            this.ctx.beginPath();
+            this.ctx.arc(radius + 25, this.canvas.height - bottomOffset, radius, 0, Math.PI * 2);
+            this.ctx.fill();
+
+            // 箭头图标
+            this.ctx.fillStyle = 'white';
+            this.ctx.font = 'bold 28px Arial';
+            this.ctx.textAlign = 'center';
+            this.ctx.textBaseline = 'middle';
+            this.ctx.fillText('←', radius + 25, this.canvas.height - bottomOffset);
+            this.ctx.restore();
+        }
+
+        // 右侧控制指示器
+        if (this.keys.ArrowRight) {
+            this.ctx.save();
+            this.ctx.fillStyle = `rgba(255, 105, 180, ${alpha})`;
+            this.ctx.beginPath();
+            this.ctx.arc(this.canvas.width - radius - 25, this.canvas.height - bottomOffset, radius, 0, Math.PI * 2);
+            this.ctx.fill();
+
+            // 箭头图标
+            this.ctx.fillStyle = 'white';
+            this.ctx.font = 'bold 28px Arial';
+            this.ctx.textAlign = 'center';
+            this.ctx.textBaseline = 'middle';
+            this.ctx.fillText('→', this.canvas.width - radius - 25, this.canvas.height - bottomOffset);
+            this.ctx.restore();
+        }
+    }
+
     // 添加显示结束消息的方法
     showEndMessage(message) {
         // 半透明黑色背景
         this.ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
         this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
-        
+
         // 显示消息
         this.ctx.fillStyle = 'white';
         this.ctx.font = 'bold 36px Arial';
         this.ctx.textAlign = 'center';
         this.ctx.textBaseline = 'middle';
-        
-        // Display only English message
-        this.ctx.fillText(message, this.canvas.width / 2, this.canvas.height / 2 - 30);
+
+        // Doodle Jump：显示游戏结束消息和高度
+        this.ctx.fillText(message, this.canvas.width / 2, this.canvas.height / 2 - 50);
+
+        // 显示高度信息
+        this.ctx.font = 'bold 24px Arial';
+        this.ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+        this.ctx.fillText(`You reached ${this.maxLevelReached}m!`, this.canvas.width / 2, this.canvas.height / 2);
 
         // 显示分数信息
         this.ctx.font = 'bold 22px Arial';
         this.ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
-        this.ctx.fillText(`Score: ${Math.floor(this.score)}`, this.canvas.width / 2, this.canvas.height / 2 + 10);
+        this.ctx.fillText(`Score: ${Math.floor(this.score)}`, this.canvas.width / 2, this.canvas.height / 2 + 35);
         this.ctx.font = '18px Arial';
         this.ctx.fillStyle = 'rgba(255, 255, 255, 0.75)';
-        this.ctx.fillText(`Best: ${this.highScore}`, this.canvas.width / 2, this.canvas.height / 2 + 38);
+        this.ctx.fillText(`Best: ${this.highScore}`, this.canvas.width / 2, this.canvas.height / 2 + 63);
 
         // 绘制重玩按钮
         const buttonWidth = 200;
@@ -1122,7 +1360,7 @@ class PlatformerGame {
                 // 检查点击是否在按钮范围内
                 if (x >= buttonX && x <= buttonX + buttonWidth &&
                     y >= buttonY && y <= buttonY + buttonHeight &&
-                    (this.gameWon || this.gameOver)) {
+                    this.gameOver) {
                     // 清除所有定时器
                     clearInterval(this.updateInterval);
                     clearInterval(this.obstacleInterval);
@@ -1133,7 +1371,6 @@ class PlatformerGame {
                     
                     // 重置游戏状态
                     this.gameStarted = false;
-                    this.gameWon = false;
                     this.gameOver = false;
                     
                     // 创建新的游戏实例
@@ -1161,17 +1398,17 @@ class PlatformerGame {
     }
 
     updateDifficulty() {
-        if (!this.startTime || this.gameWon || this.gameOver) return;
-        const elapsedSeconds = (Date.now() - this.startTime) / 1000;
-        const level = Math.min(6, 1 + Math.floor(elapsedSeconds / 12));
-        const scaling = 1 + Math.min(elapsedSeconds / 40, 1.2);
+        if (this.gameOver) return;
+        // Doodle Jump：基于高度的难度缩放
+        const height = this.maxLevelReached;
+        const level = Math.min(10, 1 + Math.floor(height / 50));
 
         this.difficulty.level = level;
-        this.difficulty.obstacleSpawnChance = Math.min(0.75, 0.4 + level * 0.05);
-        this.difficulty.obstacleSpeedBoost = Math.min(3, level * 0.4);
-        this.difficulty.platformSpeedMultiplier = Math.min(1.6, scaling);
-        this.difficulty.oriSpawnChance = Math.min(0.4, 0.15 + level * 0.03);
-        this.difficulty.oriSpeedMultiplier = Math.min(1.8, 1 + level * 0.12);
+        this.difficulty.obstacleSpawnChance = Math.min(0.6, 0.3 + level * 0.03);
+        this.difficulty.obstacleSpeedBoost = Math.min(3, level * 0.3);
+        this.difficulty.platformSpeedMultiplier = Math.min(2.0, 1 + level * 0.1);
+        this.difficulty.oriSpawnChance = Math.min(0.3, 0.1 + level * 0.02);
+        this.difficulty.oriSpeedMultiplier = Math.min(1.8, 1 + level * 0.08);
     }
 
     // 添加辅助方法来调整颜色亮度
@@ -1199,22 +1436,76 @@ class PlatformerGame {
         this.ctx.save();
         this.ctx.beginPath();
         this.ctx.fillStyle = color;
-        
+
         for (let i = 0; i < 5; i++) {
             const angle = (i * 4 * Math.PI) / 5 - Math.PI / 2;
             const x = cx + Math.cos(angle) * size;
             const y = cy + Math.sin(angle) * size;
-            
+
             if (i === 0) {
                 this.ctx.moveTo(x, y);
             } else {
                 this.ctx.lineTo(x, y);
             }
         }
-        
+
         this.ctx.closePath();
         this.ctx.fill();
         this.ctx.restore();
+    }
+
+    // Doodle Jump：绘制星空背景
+    drawStars() {
+        const starCount = 50;
+        // 使用固定的种子生成星星位置，确保星星位置稳定
+        if (!this.starPositions) {
+            this.starPositions = [];
+            for (let i = 0; i < starCount; i++) {
+                this.starPositions.push({
+                    x: Math.random() * this.canvas.width,
+                    y: Math.random() * this.canvas.height,
+                    size: 1 + Math.random() * 2,
+                    twinkle: Math.random() * Math.PI * 2
+                });
+            }
+        }
+
+        this.starPositions.forEach((star, index) => {
+            star.twinkle += 0.05;
+            const alpha = 0.5 + Math.sin(star.twinkle) * 0.5;
+
+            this.ctx.save();
+            this.ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
+            this.ctx.beginPath();
+            this.ctx.arc(star.x, star.y, star.size, 0, Math.PI * 2);
+            this.ctx.fill();
+            this.ctx.restore();
+        });
+    }
+
+    // 显示天空主题变化通知
+    showSkyThemeNotification(skyTheme) {
+        const emoji = {
+            '黎明': '🌅',
+            '清晨': '🌄',
+            '白天': '☀️',
+            '黄昏': '🌆',
+            '日落': '🌇',
+            '傍晚': '🌆',
+            '夜晚': '🌙',
+            '星空': '✨'
+        }[skyTheme.name] || '🌈';
+
+        this.scorePopups.push({
+            x: this.canvas.width / 2,
+            y: this.canvas.height / 3,
+            text: `${emoji} ${skyTheme.name}`,
+            life: 120,  // 显示更长时间
+            alpha: 1,
+            color: '#FFD700',
+            size: 28,
+            isNotification: true
+        });
     }
 }
 
