@@ -91,16 +91,16 @@ class PlatformerGame {
             smoothness: 0.08
         };
 
-        // 天空背景配置 - 根据高度变化
+        // Sky background configuration - changes based on height
         this.skyThemes = [
-            { height: 0, name: '黎明', gradient: ['#FFE4B5', '#FFDAB9', '#FFA07A'] },
-            { height: 300, name: '清晨', gradient: ['#87CEEB', '#B0E0E6', '#E0F7FA'] },
-            { height: 600, name: '白天', gradient: ['#87CEEB', '#ADD8E6', '#E0F7FA'] },
-            { height: 1200, name: '黄昏', gradient: ['#FF7E5F', '#FEB47B', '#FFD700'] },
-            { height: 1800, name: '日落', gradient: ['#FF6B6B', '#FF8E53', '#FCA5A5'] },
-            { height: 2400, name: '傍晚', gradient: ['#4A00E0', '#8E2DE2', '#2C1B4E'] },
-            { height: 3000, name: '夜晚', gradient: ['#0f0c29', '#302b63', '#24243e'] },
-            { height: 4000, name: '星空', gradient: ['#000000', '#0f0c29', '#1a1a2e'] }
+            { height: 0, name: 'Dawn', gradient: ['#FFE4B5', '#FFDAB9', '#FFA07A'] },
+            { height: 300, name: 'Morning', gradient: ['#87CEEB', '#B0E0E6', '#E0F7FA'] },
+            { height: 600, name: 'Day', gradient: ['#87CEEB', '#ADD8E6', '#E0F7FA'] },
+            { height: 1200, name: 'Dusk', gradient: ['#FF7E5F', '#FEB47B', '#FFD700'] },
+            { height: 1800, name: 'Sunset', gradient: ['#FF6B6B', '#FF8E53', '#FCA5A5'] },
+            { height: 2400, name: 'Evening', gradient: ['#4A00E0', '#8E2DE2', '#2C1B4E'] },
+            { height: 3000, name: 'Night', gradient: ['#0f0c29', '#302b63', '#24243e'] },
+            { height: 4000, name: 'Starry Night', gradient: ['#000000', '#0f0c29', '#1a1a2e'] }
         ];
         this.currentSkyGradient = null;
 
@@ -127,10 +127,11 @@ class PlatformerGame {
         // Doodle Jump：无尽模式，无出口
 
         // 游戏状态
-        this.gameStarted = false;  // 添加游戏开始状态
+        this.gameStarted = false;
         this.gameOver = false;
+        this.gamePaused = false;  // Pause state
         this.obstacleInterval = null;
-        this.imagesLoaded = false;  // 添加图片加载状态
+        this.imagesLoaded = false;
 
         // 添加标题图片
         this.titleImages = {
@@ -456,17 +457,24 @@ class PlatformerGame {
             image: new Image()
         };
         this.rat.image.src = './images/rat.jpeg';
-        
-        // 添加按键状态跟踪（Doodle Jump 只需要左右移动）
+
+        // Add key state tracking (Doodle Jump only needs left/right movement)
         this.keys = {
             ArrowRight: false,
             ArrowLeft: false
         };
 
-        // 设置键盘控制
+        // Gyroscope/accelerometer control
+        this.tiltControl = {
+            enabled: false,
+            tiltThreshold: 2,  // Minimum tilt angle to trigger movement
+            currentTilt: 0
+        };
+
+        // Setup keyboard and tilt controls
         this.setupControls();
-        
-        // 生成初始障碍物
+
+        // Generate initial obstacles
         this.generateObstacles();
 
         // 开始游戏循环
@@ -520,10 +528,14 @@ class PlatformerGame {
     }
 
     setupControls() {
-        // Doodle Jump 只需要左右控制
+        // Doodle Jump: Only need left/right controls
         this.keydownHandler = (e) => {
             if (this.keys.hasOwnProperty(e.key)) {
                 this.keys[e.key] = true;
+            }
+            // Pause functionality with ESC or P key
+            if ((e.key === 'Escape' || e.key === 'p' || e.key === 'P') && this.gameStarted && !this.gameOver) {
+                this.togglePause();
             }
         };
 
@@ -536,19 +548,112 @@ class PlatformerGame {
         document.addEventListener('keydown', this.keydownHandler);
         document.addEventListener('keyup', this.keyupHandler);
 
-        // Doodle Jump：移动端触摸控制
+        // Doodle Jump: Mobile touch controls
         this.setupTouchControls();
+
+        // Doodle Jump: Device orientation (tilt) controls
+        this.setupTiltControls();
+    }
+
+    togglePause() {
+        this.gamePaused = !this.gamePaused;
+        if (this.gamePaused) {
+            // Pause the game
+            clearInterval(this.updateInterval);
+            clearInterval(this.obstacleInterval);
+            this.playSound('start');  // Play a sound when pausing
+        } else {
+            // Resume the game
+            this.startGameLoop();
+            this.generateObstacles();
+        }
+    }
+
+    setupTiltControls() {
+        // Check if device orientation is supported
+        if (!window.DeviceOrientationEvent) {
+            console.log('Device orientation not supported');
+            return;
+        }
+
+        // Request permission for iOS 13+
+        if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+            DeviceOrientationEvent.requestPermission()
+                .then(response => {
+                    if (response === 'granted') {
+                        this.enableTiltControls();
+                    } else {
+                        console.log('Device orientation permission denied');
+                    }
+                })
+                .catch(console.error);
+        } else {
+            // Non-iOS 13+ devices
+            this.enableTiltControls();
+        }
+    }
+
+    enableTiltControls() {
+        window.addEventListener('deviceorientation', (e) => {
+            if (!this.gameStarted || this.gameOver || this.gamePaused) return;
+
+            // Get tilt from gamma (left/right tilt, -90 to 90 degrees)
+            const tilt = e.gamma || 0;
+
+            this.tiltControl.currentTilt = tilt;
+
+            // Apply tilt to movement
+            if (tilt > this.tiltControl.tiltThreshold) {
+                // Tilted right - move right
+                this.tiltControl.enabled = true;
+                this.keys.ArrowRight = true;
+                this.keys.ArrowLeft = false;
+            } else if (tilt < -this.tiltControl.tiltThreshold) {
+                // Tilted left - move left
+                this.tiltControl.enabled = true;
+                this.keys.ArrowLeft = true;
+                this.keys.ArrowRight = false;
+            } else {
+                // Device is roughly flat - stop movement
+                this.keys.ArrowLeft = false;
+                this.keys.ArrowRight = false;
+            }
+        });
     }
 
     setupTouchControls() {
-        // 触摸开始
+        // Touch start
         this.canvas.addEventListener('touchstart', (e) => {
             e.preventDefault();
+
             const touch = e.touches[0];
             const rect = this.canvas.getBoundingClientRect();
             const tapX = touch.clientX - rect.left;
+            const tapY = touch.clientY - rect.top;
 
-            // 左侧向左，右侧向右
+            // Check for pause button tap
+            if (this.pauseButtonBounds && this.gameStarted && !this.gameOver) {
+                const pauseX = this.pauseButtonBounds.x;
+                const pauseY = this.pauseButtonBounds.y;
+                const pauseSize = this.pauseButtonBounds.size;
+
+                if (tapX >= pauseX && tapX <= pauseX + pauseSize &&
+                    tapY >= pauseY && tapY <= pauseY + pauseSize) {
+                    this.togglePause();
+                    return;
+                }
+            }
+
+            // If paused, any touch resumes the game
+            if (this.gamePaused) {
+                this.togglePause();
+                return;
+            }
+
+            // Don't move if paused
+            if (this.gamePaused) return;
+
+            // Left side to move left, right side to move right
             if (tapX < this.canvas.width / 2) {
                 this.keys.ArrowLeft = true;
                 this.keys.ArrowRight = false;
@@ -558,26 +663,30 @@ class PlatformerGame {
             }
         }, { passive: false });
 
-        // 触摸移动
+        // Touch move
         this.canvas.addEventListener('touchmove', (e) => {
             e.preventDefault();
+
+            // Don't move if paused
+            if (this.gamePaused) return;
+
             const touch = e.touches[0];
             const rect = this.canvas.getBoundingClientRect();
             const currentX = touch.clientX - rect.left;
 
-            // 根据手指位置更新方向
+            // Update direction based on finger position
             this.keys.ArrowLeft = currentX < this.canvas.width / 2;
             this.keys.ArrowRight = currentX >= this.canvas.width / 2;
         }, { passive: false });
 
-        // 触摸结束
+        // Touch end
         this.canvas.addEventListener('touchend', (e) => {
             e.preventDefault();
             this.keys.ArrowLeft = false;
             this.keys.ArrowRight = false;
         }, { passive: false });
 
-        // 触摸取消
+        // Touch cancel
         this.canvas.addEventListener('touchcancel', (e) => {
             e.preventDefault();
             this.keys.ArrowLeft = false;
@@ -644,7 +753,10 @@ class PlatformerGame {
     }
 
     updateMovement() {
-        // Doodle Jump：首先更新相机
+        // Skip updates if paused
+        if (this.gamePaused) return;
+
+        // Doodle Jump: Update camera first
         this.updateCamera();
 
         // 管理平台（动态生成和移除）
@@ -955,10 +1067,44 @@ class PlatformerGame {
         this.ctx.fillText(`Best: ${this.highScore}`, x + 14, y + 48);
         this.ctx.fillText(`Height: ${heightValue}m`, x + 100, y + 48);
 
-        // 显示当前时间/天空主题
-        this.ctx.fillStyle = skyTheme.gradient[2] === '#1a1a2e' ? '#888' : '#666';
+        // Show current time/sky theme
+        this.ctx.fillStyle = '#666';
         this.ctx.font = 'bold 13px Arial';
-        this.ctx.fillText(`🌅 ${skyTheme.name}`, x + 14, y + 70);
+        this.ctx.fillText(`${skyTheme.name}`, x + 14, y + 70);
+        this.ctx.restore();
+
+        // Draw pause button
+        this.drawPauseButton();
+    }
+
+    drawPauseButton() {
+        const buttonSize = 40;
+        const padding = 10;
+        const x = this.canvas.width - buttonSize - padding;
+        const y = padding;
+
+        // Store button bounds for click detection
+        this.pauseButtonBounds = { x, y, size: buttonSize };
+
+        // Draw button background
+        this.ctx.save();
+        this.ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+        this.ctx.shadowColor = 'rgba(0, 0, 0, 0.2)';
+        this.ctx.shadowBlur = 5;
+        this.ctx.beginPath();
+        this.ctx.arc(x + buttonSize / 2, y + buttonSize / 2, buttonSize / 2, 0, Math.PI * 2);
+        this.ctx.fill();
+
+        // Draw pause icon (two vertical bars)
+        this.ctx.fillStyle = '#333';
+        const barWidth = 4;
+        const barHeight = 14;
+        const spacing = 4;
+        const startX = x + (buttonSize - barWidth * 2 - spacing) / 2;
+        const startY = y + (buttonSize - barHeight) / 2;
+
+        this.ctx.fillRect(startX, startY, barWidth, barHeight);
+        this.ctx.fillRect(startX + barWidth + spacing, startY, barWidth, barHeight);
         this.ctx.restore();
     }
 
@@ -1174,13 +1320,18 @@ class PlatformerGame {
         // Doodle Jump：绘制触摸控制指示器
         this.drawTouchControls();
 
-        // 绘制分数HUD与得分浮动
+        // Draw score HUD and score popups
         this.drawScoreHUD();
         this.drawScorePopups();
 
-        // Doodle Jump：无尽模式只有游戏结束
+        // Doodle Jump: Endless mode only has game over
         if (this.gameOver) {
             this.showEndMessage('Game Over!');
+        }
+
+        // Draw pause overlay if paused
+        if (this.gamePaused) {
+            this.drawPauseOverlay();
         }
     }
 
@@ -1305,7 +1456,31 @@ class PlatformerGame {
         }
     }
 
-    // 添加显示结束消息的方法
+    // Draw pause overlay
+    drawPauseOverlay() {
+        // Semi-transparent dark background
+        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+        this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+
+        // Pause text
+        this.ctx.fillStyle = 'white';
+        this.ctx.font = 'bold 48px Arial';
+        this.ctx.textAlign = 'center';
+        this.ctx.textBaseline = 'middle';
+        this.ctx.fillText('PAUSED', this.canvas.width / 2, this.canvas.height / 2 - 40);
+
+        // Instructions
+        this.ctx.font = '20px Arial';
+        this.ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+        this.ctx.fillText('Press ESC or P to resume', this.canvas.width / 2, this.canvas.height / 2 + 20);
+
+        // Small hint
+        this.ctx.font = '14px Arial';
+        this.ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+        this.ctx.fillText('Tap screen to resume on mobile', this.canvas.width / 2, this.canvas.height / 2 + 55);
+    }
+
+    // Show end message method
     showEndMessage(message) {
         // 半透明黑色背景
         this.ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
@@ -1333,54 +1508,76 @@ class PlatformerGame {
         this.ctx.fillStyle = 'rgba(255, 255, 255, 0.75)';
         this.ctx.fillText(`Best: ${this.highScore}`, this.canvas.width / 2, this.canvas.height / 2 + 63);
 
-        // 绘制重玩按钮
+        // Draw replay button
         const buttonWidth = 200;
         const buttonHeight = 50;
         const buttonX = this.canvas.width / 2 - buttonWidth / 2;
-        const buttonY = this.canvas.height / 2 + 70;
+        const buttonY = this.canvas.height / 2 + 95;
 
-        // 绘制按钮背景
+        // Store button bounds for click detection
+        this.replayButtonBounds = { x: buttonX, y: buttonY, width: buttonWidth, height: buttonHeight };
+
+        // Draw button background
         this.ctx.fillStyle = '#4CAF50';
         this.ctx.beginPath();
         this.ctx.roundRect(buttonX, buttonY, buttonWidth, buttonHeight, 10);
         this.ctx.fill();
-        
-        // 绘制按钮文字
+
+        // Draw button text
         this.ctx.fillStyle = 'white';
         this.ctx.font = 'bold 24px Arial';
-        this.ctx.fillText('Replay', this.canvas.width / 2, buttonY + buttonHeight / 2);
+        this.ctx.fillText('Play Again', this.canvas.width / 2, buttonY + buttonHeight / 2);
 
-        // 如果还没有添加点击事件监听器，则添加
+        // Add click event listener if not already added
         if (!this.replayButtonAdded) {
             this.canvas.addEventListener('click', (event) => {
                 const rect = this.canvas.getBoundingClientRect();
                 const x = event.clientX - rect.left;
                 const y = event.clientY - rect.top;
 
-                // 检查点击是否在按钮范围内
-                if (x >= buttonX && x <= buttonX + buttonWidth &&
-                    y >= buttonY && y <= buttonY + buttonHeight &&
-                    this.gameOver) {
-                    // 清除所有定时器
-                    clearInterval(this.updateInterval);
-                    clearInterval(this.obstacleInterval);
-                    
-                    // 移除所有事件监听器
-                    document.removeEventListener('keydown', this.keydownHandler);
-                    document.removeEventListener('keyup', this.keyupHandler);
-                    
-                    // 重置游戏状态
-                    this.gameStarted = false;
-                    this.gameOver = false;
-                    
-                    // 创建新的游戏实例
-                    const game = new PlatformerGame();
-                    // 显示开始界面
-                    game.showStartScreen();
+                // Check for pause button click first (only when game is running)
+                if (this.pauseButtonBounds && this.gameStarted && !this.gameOver) {
+                    const pauseX = this.pauseButtonBounds.x;
+                    const pauseY = this.pauseButtonBounds.y;
+                    const pauseSize = this.pauseButtonBounds.size;
+
+                    if (x >= pauseX && x <= pauseX + pauseSize &&
+                        y >= pauseY && y <= pauseY + pauseSize) {
+                        this.togglePause();
+                        return;
+                    }
+                }
+
+                // Then check for replay button click
+                if (!this.gameOver || !this.replayButtonBounds) return;
+
+                // Check if click is within button bounds
+                if (x >= this.replayButtonBounds.x && x <= this.replayButtonBounds.x + this.replayButtonBounds.width &&
+                    y >= this.replayButtonBounds.y && y <= this.replayButtonBounds.y + this.replayButtonBounds.height) {
+                    this.restartGame();
                 }
             });
             this.replayButtonAdded = true;
         }
+    }
+
+    restartGame() {
+        // Clear all timers
+        clearInterval(this.updateInterval);
+        clearInterval(this.obstacleInterval);
+
+        // Remove all event listeners
+        document.removeEventListener('keydown', this.keydownHandler);
+        document.removeEventListener('keyup', this.keyupHandler);
+
+        // Reset game state
+        this.gameStarted = false;
+        this.gameOver = false;
+
+        // Create new game instance
+        const game = new PlatformerGame();
+        // Show start screen
+        game.showStartScreen();
     }
 
     // 添加Ori移动控制方法
@@ -1483,24 +1680,24 @@ class PlatformerGame {
         });
     }
 
-    // 显示天空主题变化通知
+    // Show sky theme change notification
     showSkyThemeNotification(skyTheme) {
         const emoji = {
-            '黎明': '🌅',
-            '清晨': '🌄',
-            '白天': '☀️',
-            '黄昏': '🌆',
-            '日落': '🌇',
-            '傍晚': '🌆',
-            '夜晚': '🌙',
-            '星空': '✨'
+            'Dawn': '🌅',
+            'Morning': '🌄',
+            'Day': '☀️',
+            'Dusk': '🌆',
+            'Sunset': '🌇',
+            'Evening': '🌆',
+            'Night': '🌙',
+            'Starry Night': '✨'
         }[skyTheme.name] || '🌈';
 
         this.scorePopups.push({
             x: this.canvas.width / 2,
             y: this.canvas.height / 3,
             text: `${emoji} ${skyTheme.name}`,
-            life: 120,  // 显示更长时间
+            life: 120,  // Display longer
             alpha: 1,
             color: '#FFD700',
             size: 28,
