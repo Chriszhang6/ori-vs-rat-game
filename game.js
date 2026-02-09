@@ -234,7 +234,7 @@ class PlatformerGame {
         // 显示开始界面
         this.showStartScreen();
 
-        // 修改点击事件
+        // Modify click events for desktop
         this.canvas.addEventListener('mousedown', (event) => {
             if (!this.gameStarted) {
                 const rect = this.canvas.getBoundingClientRect();
@@ -249,7 +249,7 @@ class PlatformerGame {
                 if (distance <= this.startButtonBounds.radius) {
                     this.startButton.isPressed = true;
                     this.startButton.pressStartTime = Date.now();
-                    // 重绘开始界面以显示按压效果
+                    // Redraw start screen to show press effect
                     this.showStartScreen();
                 }
             }
@@ -267,13 +267,58 @@ class PlatformerGame {
                 );
 
                 if (distance <= this.startButtonBounds.radius) {
-                    // 等待按压动画完成后开始游戏
-                    setTimeout(() => this.startGame(), 
+                    // Wait for press animation to complete before starting game
+                    setTimeout(() => this.startGame(),
                         Math.max(0, this.startButton.pressDuration - (Date.now() - this.startButton.pressStartTime)));
                 }
                 this.startButton.isPressed = false;
             }
         });
+
+        // Add touch events for mobile devices
+        this.canvas.addEventListener('touchstart', (event) => {
+            if (!this.gameStarted) {
+                event.preventDefault();
+                const touch = event.touches[0];
+                const rect = this.canvas.getBoundingClientRect();
+                const x = touch.clientX - rect.left;
+                const y = touch.clientY - rect.top;
+
+                const distance = Math.sqrt(
+                    Math.pow(x - this.startButtonBounds.x, 2) +
+                    Math.pow(y - this.startButtonBounds.y, 2)
+                );
+
+                if (distance <= this.startButtonBounds.radius) {
+                    this.startButton.isPressed = true;
+                    this.startButton.pressStartTime = Date.now();
+                    // Redraw start screen to show press effect
+                    this.showStartScreen();
+                }
+            }
+        }, { passive: false });
+
+        this.canvas.addEventListener('touchend', (event) => {
+            if (!this.gameStarted && this.startButton.isPressed) {
+                event.preventDefault();
+                const touch = event.changedTouches[0];
+                const rect = this.canvas.getBoundingClientRect();
+                const x = touch.clientX - rect.left;
+                const y = touch.clientY - rect.top;
+
+                const distance = Math.sqrt(
+                    Math.pow(x - this.startButtonBounds.x, 2) +
+                    Math.pow(y - this.startButtonBounds.y, 2)
+                );
+
+                if (distance <= this.startButtonBounds.radius) {
+                    // Wait for press animation to complete before starting game
+                    setTimeout(() => this.startGame(),
+                        Math.max(0, this.startButton.pressDuration - (Date.now() - this.startButton.pressStartTime)));
+                }
+                this.startButton.isPressed = false;
+            }
+        }, { passive: false });
     }
 
     // 添加显示开始界面的方法
@@ -1530,6 +1575,7 @@ class PlatformerGame {
 
         // Add click event listener if not already added
         if (!this.replayButtonAdded) {
+            // Desktop click handler
             this.canvas.addEventListener('click', (event) => {
                 const rect = this.canvas.getBoundingClientRect();
                 const x = event.clientX - rect.left;
@@ -1557,6 +1603,24 @@ class PlatformerGame {
                     this.restartGame();
                 }
             });
+
+            // Mobile touch handler for replay button
+            this.canvas.addEventListener('touchstart', (event) => {
+                if (!this.gameOver || !this.replayButtonBounds) return;
+
+                const touch = event.touches[0];
+                const rect = this.canvas.getBoundingClientRect();
+                const x = touch.clientX - rect.left;
+                const y = touch.clientY - rect.top;
+
+                // Check if touch is within button bounds
+                if (x >= this.replayButtonBounds.x && x <= this.replayButtonBounds.x + this.replayButtonBounds.width &&
+                    y >= this.replayButtonBounds.y && y <= this.replayButtonBounds.y + this.replayButtonBounds.height) {
+                    event.preventDefault();
+                    this.restartGame();
+                }
+            }, { passive: false });
+
             this.replayButtonAdded = true;
         }
     }
