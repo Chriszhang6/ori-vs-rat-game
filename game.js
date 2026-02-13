@@ -79,6 +79,10 @@ class PlatformerGame {
         console.log('Platformer Game initializing...');
         this.canvas = document.getElementById('gameCanvas');
         this.ctx = this.canvas.getContext('2d');
+
+        // Store event handler references for proper cleanup
+        this.replayClickHandler = null;
+        this.replayTouchHandler = null;
         
         // Doodle Jump 风格：竖屏画布
         this.canvas.width = 450;
@@ -1576,7 +1580,7 @@ class PlatformerGame {
         // Add click event listener if not already added
         if (!this.replayButtonAdded) {
             // Desktop click handler
-            this.canvas.addEventListener('click', (event) => {
+            this.replayClickHandler = (event) => {
                 const rect = this.canvas.getBoundingClientRect();
                 const x = event.clientX - rect.left;
                 const y = event.clientY - rect.top;
@@ -1602,10 +1606,11 @@ class PlatformerGame {
                     y >= this.replayButtonBounds.y && y <= this.replayButtonBounds.y + this.replayButtonBounds.height) {
                     this.restartGame();
                 }
-            });
+            };
+            this.canvas.addEventListener('click', this.replayClickHandler);
 
             // Mobile touch handler for replay button
-            this.canvas.addEventListener('touchstart', (event) => {
+            this.replayTouchHandler = (event) => {
                 if (!this.gameOver || !this.replayButtonBounds) return;
 
                 const touch = event.touches[0];
@@ -1619,7 +1624,8 @@ class PlatformerGame {
                     event.preventDefault();
                     this.restartGame();
                 }
-            }, { passive: false });
+            };
+            this.canvas.addEventListener('touchstart', this.replayTouchHandler, { passive: false });
 
             this.replayButtonAdded = true;
         }
@@ -1630,9 +1636,17 @@ class PlatformerGame {
         clearInterval(this.updateInterval);
         clearInterval(this.obstacleInterval);
 
-        // Remove all event listeners
+        // Remove all event listeners including replay button handlers
         document.removeEventListener('keydown', this.keydownHandler);
         document.removeEventListener('keyup', this.keyupHandler);
+
+        // Remove replay button event listeners if they exist
+        if (this.replayClickHandler) {
+            this.canvas.removeEventListener('click', this.replayClickHandler);
+        }
+        if (this.replayTouchHandler) {
+            this.canvas.removeEventListener('touchstart', this.replayTouchHandler);
+        }
 
         // Reset game state
         this.gameStarted = false;
